@@ -45,6 +45,22 @@ type State struct {
 	ProofsMode types.ProofsMode
 }
 
+type StorageDealProposal struct {
+	PieceRef  []byte // cid bytes // TODO: spec says to use cid.Cid, probably not a good idea
+	PieceSize types.Uint64
+
+	Client   address.Address
+	Provider address.Address
+
+	ProposalExpiration types.Uint64
+	Duration           types.Uint64
+
+	StoragePricePerEpoch types.Uint64
+	StorageCollateral    types.Uint64
+
+	ProposerSignature *types.Signature
+}
+
 // Actor methods
 const (
 	CreateStorageMiner types.MethodID = iota + 32
@@ -52,6 +68,7 @@ const (
 	GetTotalStorage
 	GetProofsMode
 	GetLateMiners
+	PublishStorageDeals
 )
 
 // NewActor returns a new storage market actor.
