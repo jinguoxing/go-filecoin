@@ -19,7 +19,6 @@ require (
 	github.com/filecoin-project/filecoin-ffi v0.0.0-20191221090835-c7bbef445934
 	github.com/filecoin-project/go-address v0.0.0-20191219011437-af739c490b4f
 	github.com/filecoin-project/go-amt-ipld v0.0.0-20190920035751-ae3c37184616
-	github.com/filecoin-project/go-bls-sigs v0.0.0
 	github.com/filecoin-project/go-leb128 v0.0.0-20190212224330-8d79a5489543
 	github.com/filecoin-project/go-sectorbuilder v0.0.0-20200109194458-9656ce473254
 	github.com/filecoin-project/go-storage-miner v0.0.0-20200109233201-68496757e9fc
@@ -117,7 +116,5 @@ require (
 	gopkg.in/yaml.v2 v2.2.5 // indirect
 	gotest.tools v2.2.0+incompatible
 )
-
-replace github.com/filecoin-project/go-bls-sigs => ./vendors/go-bls-sigs
 
 replace github.com/filecoin-project/filecoin-ffi => ./vendors/filecoin-ffi
