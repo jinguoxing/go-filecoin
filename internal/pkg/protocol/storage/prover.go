@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
-	"github.com/filecoin-project/go-sectorbuilder"
 	logging "github.com/ipfs/go-log"
 	"github.com/pkg/errors"
 
@@ -45,7 +44,7 @@ type ProofReader interface {
 type ProofCalculator interface {
 	// CalculatePoSt computes a proof-of-spacetime for a list of sector ids and matching seeds.
 	// It returns the Snark Proof for the PoSt and a list of sector ids that failed.
-	CalculatePoSt(ctx context.Context, sectorInfo go_sectorbuilder.SortedSectorInfo, seed types.PoStChallengeSeed) (types.PoStProof, error)
+	CalculatePoSt(ctx context.Context, seed types.PoStChallengeSeed) (types.PoStProof, error)
 }
 
 // Prover orchestrates the calculation and submission of a proof-of-spacetime.
@@ -84,69 +83,70 @@ func NewProver(actor address.Address, sectorSize *types.BytesAmount, reader Proo
 
 // CalculatePoSt computes and returns a proof-of-spacetime ready for posting on chain.
 func (p *Prover) CalculatePoSt(ctx context.Context, start, end *types.BlockHeight, inputs []PoStInputs) (*PoStSubmission, error) {
-	// Gather PoSt request inputs.
-	seed, err := p.challengeSeed(ctx, start)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch PoSt challenge seed")
-	}
-	// Compute the actual proof.
-	sectorInfos := make([]go_sectorbuilder.SectorInfo, len(inputs))
-	for i, input := range inputs {
-		info := go_sectorbuilder.SectorInfo{
-			CommR: input.CommR,
-		}
-		sectorInfos[i] = info
-	}
-	logProver.Infof("Prover calculating post for addr %s -- start: %s -- end: %s -- seed: %x", p.actorAddress, start, end, seed)
-	for i, ssi := range sectorInfos {
-		logProver.Infof("ssi %d: sector id %d -- commR %x", i, ssi.SectorID, ssi.CommR)
-	}
-
-	proof, err := p.calculator.CalculatePoSt(ctx, go_sectorbuilder.NewSortedSectorInfo(sectorInfos...), seed)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to calculate PoSt")
-	}
-
-	// Compute fees.
-	headKey := p.chain.ChainHeadKey()
-	workerAddr, err := p.chain.MinerGetWorkerAddress(ctx, p.actorAddress, headKey)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read miner worker address for miner %s", p.actorAddress)
-	}
-
-	balance, err := p.chain.WalletBalance(ctx, workerAddr)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to check wallet balance for %s", workerAddr)
-	}
-
-	head, err := p.chain.ChainTipSet(headKey)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve head: %s", headKey.String())
-	}
-	h, err := head.Height()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get height from head: %s", headKey.String())
-	}
-	height := types.NewBlockHeight(h)
-	if height.LessThan(start) {
-		return nil, errors.Errorf("chain height %s is before proving period start %s, abandoning proof", height, start)
-	}
-
-	feeDue, err := p.calculateFee(ctx, height, end)
-	if err != nil {
-		return nil, err
-	}
-	if feeDue.GreaterThan(balance) {
-		log.Warnf("PoSt fee of %s exceeds available balance of %s for owner %s", feeDue, balance, workerAddr)
-		// Submit anyway, in case the balance is topped up before the PoSt message is mined.
-	}
-
-	return &PoStSubmission{
-		Proof:    proof,
-		Fee:      feeDue,
-		GasLimit: types.NewGasUnits(submitPostGasLimit),
-		Faults:   types.EmptyFaultSet(),
-	}, nil
+	panic("we need a sectorbuiler to calculate post")
+	//// Gather PoSt request inputs.
+	//seed, err := p.challengeSeed(ctx, start)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to fetch PoSt challenge seed")
+	//}
+	//// Compute the actual proof.
+	//sectorInfos := make([]go_sectorbuilder.SectorInfo, len(inputs))
+	//for i, input := range inputs {
+	//	info := go_sectorbuilder.SectorInfo{
+	//		CommR: input.CommR,
+	//	}
+	//	sectorInfos[i] = info
+	//}
+	//logProver.Infof("Prover calculating post for addr %s -- start: %s -- end: %s -- seed: %x", p.actorAddress, start, end, seed)
+	//for i, ssi := range sectorInfos {
+	//	logProver.Infof("ssi %d: sector id %d -- commR %x", i, ssi.SectorID, ssi.CommR)
+	//}
+	//
+	//proof, err := p.calculator.CalculatePoSt(ctx, go_sectorbuilder.NewSortedSectorInfo(sectorInfos...), seed)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed to calculate PoSt")
+	//}
+	//
+	//// Compute fees.
+	//headKey := p.chain.ChainHeadKey()
+	//workerAddr, err := p.chain.MinerGetWorkerAddress(ctx, p.actorAddress, headKey)
+	//if err != nil {
+	//	return nil, errors.Wrapf(err, "failed to read miner worker address for miner %s", p.actorAddress)
+	//}
+	//
+	//balance, err := p.chain.WalletBalance(ctx, workerAddr)
+	//if err != nil {
+	//	return nil, errors.Wrapf(err, "failed to check wallet balance for %s", workerAddr)
+	//}
+	//
+	//head, err := p.chain.ChainTipSet(headKey)
+	//if err != nil {
+	//	return nil, errors.Wrapf(err, "failed to retrieve head: %s", headKey.String())
+	//}
+	//h, err := head.Height()
+	//if err != nil {
+	//	return nil, errors.Wrapf(err, "failed to get height from head: %s", headKey.String())
+	//}
+	//height := types.NewBlockHeight(h)
+	//if height.LessThan(start) {
+	//	return nil, errors.Errorf("chain height %s is before proving period start %s, abandoning proof", height, start)
+	//}
+	//
+	//feeDue, err := p.calculateFee(ctx, height, end)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if feeDue.GreaterThan(balance) {
+	//	log.Warnf("PoSt fee of %s exceeds available balance of %s for owner %s", feeDue, balance, workerAddr)
+	//	// Submit anyway, in case the balance is topped up before the PoSt message is mined.
+	//}
+	//
+	//return &PoStSubmission{
+	//	Proof:    proof,
+	//	Fee:      feeDue,
+	//	GasLimit: types.NewGasUnits(submitPostGasLimit),
+	//	Faults:   types.EmptyFaultSet(),
+	//}, nil
 }
 
 // challengeSeed returns the PoSt challenge seed for a proving period.

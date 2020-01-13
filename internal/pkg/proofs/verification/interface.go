@@ -1,25 +1,31 @@
 package verification
 
 import (
+	"context"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
 	go_sectorbuilder "github.com/filecoin-project/go-sectorbuilder"
 )
 
 // VerifySealRequest represents a request to verify the output of a Seal() operation.
 type VerifySealRequest struct {
-	CommD      types.CommD      // returned from seal
-	CommR      types.CommR      // returned from seal
-	CommRStar  types.CommRStar  // returned from seal
-	Proof      types.PoRepProof // returned from seal
-	ProverID   [31]byte         // uniquely identifies miner
-	SectorID   uint64           // uniquely identifies sector
-	SectorSize *types.BytesAmount
+	CommD         types.CommD      // returned from seal
+	CommR         types.CommR      // returned from seal
+	CommRStar     types.CommRStar  // returned from seal
+	Proof         types.PoRepProof // returned from seal
+	ProverAddress address.Address  // uniquely identifies miner
+	Ticket        []byte           // ticket for VRF
+	Seed          []byte           // seed for VRF
+	SectorID      uint64           // uniquely identifies sector
+	SectorSize    *types.BytesAmount
 }
 
 // VerifyPoStRequest represents a request to generate verify a proof-of-spacetime.
 type VerifyPoStRequest struct {
 	ChallengeSeed    types.PoStChallengeSeed
-	SortedSectorInfo go_sectorbuilder.SortedSectorInfo
+	SortedSectorInfo go_sectorbuilder.SortedPublicSectorInfo
+	Candidates       []go_sectorbuilder.EPostCandidate
+	ProverAddress    address.Address
 	Faults           []uint64
 	Proof            types.PoStProof
 	SectorSize       *types.BytesAmount
@@ -53,7 +59,6 @@ type VerifyPieceInclusionProofResponse struct {
 
 // Verifier provides an interface to the proving subsystem.
 type Verifier interface {
-	VerifyPoSt(VerifyPoStRequest) (VerifyPoStResponse, error)
+	VerifyFallbackPoSt(context.Context, VerifyPoStRequest) (VerifyPoStResponse, error)
 	VerifySeal(VerifySealRequest) (VerifySealResponse, error)
-	VerifyPieceInclusionProof(VerifyPieceInclusionProofRequest) (VerifyPieceInclusionProofResponse, error)
 }

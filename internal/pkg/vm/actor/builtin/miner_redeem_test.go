@@ -10,7 +10,6 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p-core/peer"
 
-	sbtesting "github.com/filecoin-project/go-filecoin/internal/pkg/sectorbuilder/testing"
 	th "github.com/filecoin-project/go-filecoin/internal/pkg/testhelpers"
 	tf "github.com/filecoin-project/go-filecoin/internal/pkg/testhelpers/testflags"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
@@ -20,7 +19,6 @@ import (
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/internal/storagemap"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/state"
-	go_sectorbuilder "github.com/filecoin-project/go-sectorbuilder"
 
 	"github.com/stretchr/testify/require"
 )

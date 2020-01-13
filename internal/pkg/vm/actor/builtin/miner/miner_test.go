@@ -790,7 +790,7 @@ func TestMinerSubmitPoStVerification(t *testing.T) {
 		minerState.SectorCommitments.Add(2, types.Commitments{CommR: comm2.CommR})
 		minerState.SectorCommitments.Add(3, types.Commitments{CommR: comm3.CommR})
 
-		// The 3 sector is not in the proving set, so its CommR should not appear in the VerifyPoSt request
+		// The 3 sector is not in the proving set, so its CommR should not appear in the VerifyFallbackPoSt request
 		minerState.ProvingSet = types.NewIntSet(1, 2)
 		verifier := &verification.FakeVerifier{
 			VerifyPoStValid: true,
@@ -1684,7 +1684,7 @@ func TestGetProvingSetCommitments(t *testing.T) {
 		minerState := *NewState(address.TestAddress, address.TestAddress, peer.ID(""), types.OneKiBSectorSize)
 		minerState.SectorCommitments = commitments
 
-		// The 3 sector is not in the proving set, so its CommR should not appear in the VerifyPoSt request
+		// The 3 sector is not in the proving set, so its CommR should not appear in the VerifyFallbackPoSt request
 		minerState.ProvingSet = types.NewIntSet(1, 2)
 
 		vmctx := vm.NewFakeVMContext(message, minerState)

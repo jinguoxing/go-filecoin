@@ -7,7 +7,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	cmdkit "github.com/ipfs/go-ipfs-cmdkit"
-	"github.com/ipfs/go-ipfs-cmds"
+	cmds "github.com/ipfs/go-ipfs-cmds"
 	files "github.com/ipfs/go-ipfs-files"
 
 	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/porcelain"
@@ -26,7 +26,6 @@ var miningCmd = &cmds.Command{
 		"status":    miningStatusCmd,
 		"stop":      miningStopCmd,
 		"setup":     miningSetupCmd,
-		"seal-now":  miningSealCmd,
 		"add-piece": miningAddPieceCmd,
 	},
 }
@@ -195,19 +194,6 @@ var miningStopCmd = &cmds.Command{
 	Encoders: stringEncoderMap,
 }
 
-var miningSealCmd = &cmds.Command{
-	Helptext: cmdkit.HelpText{
-		Tagline: "Start sealing all staged sectors",
-	},
-	Run: func(req *cmds.Request, re cmds.ResponseEmitter, env cmds.Environment) error {
-		if err := GetPorcelainAPI(env).SealNow(req.Context); err != nil {
-			return err
-		}
-		return re.Emit("sealing started")
-	},
-	Encoders: stringEncoderMap,
-}
-
 var stringEncoderMap = cmds.EncoderMap{
 	cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, t string) error {
 		fmt.Fprintln(w, t) // nolint: errcheck
@@ -242,7 +228,8 @@ to add data outside of a deal.
 			return fmt.Errorf("given file was not a files.File")
 		}
 
-		sectorID, err := GetPorcelainAPI(env).AddPiece(req.Context, fi)
+		panic("we need a deal id here")
+		sectorID, err := GetPorcelainAPI(env).AddPiece(req.Context, 42, fi)
 		if err != nil {
 			return err
 		}

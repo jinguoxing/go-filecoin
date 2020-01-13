@@ -9,6 +9,7 @@ import (
 
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/chainsync/status"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/piecemanager"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/state"
 	"github.com/ipfs/go-cid"
@@ -30,7 +31,6 @@ import (
 	"github.com/filecoin-project/go-filecoin/internal/pkg/message"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/net"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/protocol/storage/storagedeal"
-	"github.com/filecoin-project/go-filecoin/internal/pkg/sectorbuilder"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
@@ -56,7 +56,7 @@ type API struct {
 	msgWaiter     *msg.Waiter
 	network       *net.Network
 	outbox        *message.Outbox
-	sectorBuilder func() sectorbuilder.SectorBuilder
+	sectorBuilder func() piecemanager.PieceManager
 	storagedeals  *strgdls.Store
 	wallet        *wallet.Wallet
 }
@@ -75,7 +75,7 @@ type APIDeps struct {
 	MsgWaiter     *msg.Waiter
 	Network       *net.Network
 	Outbox        *message.Outbox
-	SectorBuilder func() sectorbuilder.SectorBuilder
+	SectorBuilder func() piecemanager.PieceManager
 	Wallet        *wallet.Wallet
 }
 
@@ -401,7 +401,7 @@ func (api *API) DAGImportData(ctx context.Context, data io.Reader) (ipld.Node, e
 	return api.dag.ImportData(ctx, data)
 }
 
-// SectorBuilder returns the sector builder
-func (api *API) SectorBuilder() sectorbuilder.SectorBuilder {
+// PieceManager returns the sector builder
+func (api *API) SectorBuilder() piecemanager.PieceManager {
 	return api.sectorBuilder()
 }

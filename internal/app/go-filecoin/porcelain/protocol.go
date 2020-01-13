@@ -66,7 +66,7 @@ func ProtocolParameters(ctx context.Context, plumbing protocolParamsPlumbing) (*
 
 	supportedSectors := []SectorInfo{}
 	for _, sectorSize := range sectorSizes {
-		maxUserBytes := types.NewBytesAmount(go_sectorbuilder.GetMaxUserBytesPerStagedSector(sectorSize.Uint64()))
+		maxUserBytes := types.NewBytesAmount(go_sectorbuilder.UserBytesForSectorSize(sectorSize.Uint64()))
 		supportedSectors = append(supportedSectors, SectorInfo{sectorSize, maxUserBytes})
 	}
 

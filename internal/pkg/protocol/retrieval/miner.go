@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 
 	cbu "github.com/filecoin-project/go-filecoin/internal/pkg/cborutil"
-	"github.com/filecoin-project/go-filecoin/internal/pkg/sectorbuilder"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/piecemanager"
 )
 
 var log = logging.Logger("/fil/retrieval")
@@ -19,7 +19,7 @@ const retrievalFreeProtocol = protocol.ID("/fil/retrieval/free/0.0.0")
 // TODO: better name
 type minerNode interface {
 	Host() host.Host
-	SectorBuilder() sectorbuilder.SectorBuilder
+	SectorBuilder() piecemanager.PieceManager
 }
 
 // Miner serves requests for pieces from RetrievalClients.

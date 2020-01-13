@@ -10,7 +10,6 @@ import (
 	"github.com/filecoin-project/go-filecoin/internal/pkg/encoding/gen"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/protocol/retrieval"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/protocol/storage/storagedeal"
-	"github.com/filecoin-project/go-filecoin/internal/pkg/sectorbuilder"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor/builtin/account"
@@ -86,7 +85,7 @@ func main() {
 	}
 
 	if err := gen.WriteToFile(filepath.Join(base, "proofs/sectorbuilder/sectorbuilder_encoding_gen.go"), gen.IpldCborTypeEncodingGenerator{}, "sectorbuilder",
-		sectorbuilder.PieceInfo{}, // proofs/sectorbuilder/interface.go
+		piecemanager.PieceInfo{}, // proofs/sectorbuilder/interface.go
 	); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

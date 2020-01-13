@@ -13,9 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	. "github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/porcelain"
-	"github.com/filecoin-project/go-filecoin/internal/pkg/sectorbuilder"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
-	"github.com/filecoin-project/go-sectorbuilder"
 )
 
 func TestSealNow(t *testing.T) {
@@ -60,7 +58,7 @@ type testSectorBuilderPlumbing struct {
 
 var testPieceData = []byte{1, 2, 3}
 
-func (tsbp *testSectorBuilderPlumbing) SectorBuilder() sectorbuilder.SectorBuilder {
+func (tsbp *testSectorBuilderPlumbing) SectorBuilder() piecemanager.PieceManager {
 	return tsbp.sectorbuilder
 }
 
@@ -100,12 +98,12 @@ func (tsb *testSectorBuilder) GetAllStagedSectors() ([]go_sectorbuilder.StagedSe
 	return make([]go_sectorbuilder.StagedSectorMetadata, tsb.numStagedSectors), nil
 }
 
-func (tsb *testSectorBuilder) SectorSealResults() <-chan sectorbuilder.SectorSealResult {
+func (tsb *testSectorBuilder) SectorSealResults() <-chan piecemanager.SectorSealResult {
 	return nil
 }
 
-func (tsb *testSectorBuilder) GeneratePoSt(sectorbuilder.GeneratePoStRequest) (sectorbuilder.GeneratePoStResponse, error) {
-	return sectorbuilder.GeneratePoStResponse{}, nil
+func (tsb *testSectorBuilder) GeneratePoSt(piecemanager.GeneratePoStRequest) (piecemanager.GeneratePoStResponse, error) {
+	return piecemanager.GeneratePoStResponse{}, nil
 }
 
 func (tsb *testSectorBuilder) Close() error {

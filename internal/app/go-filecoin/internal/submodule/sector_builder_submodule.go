@@ -3,13 +3,13 @@ package submodule
 import (
 	"context"
 
-	"github.com/filecoin-project/go-filecoin/internal/pkg/sectorbuilder"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/piecemanager"
 )
 
 // SectorBuilderSubmodule enhances the `Node` with sector storage capabilities.
 type SectorBuilderSubmodule struct {
-	// SectorBuilder is used by the miner to fill and seal sectors.
-	SectorBuilder sectorbuilder.SectorBuilder
+	// PieceManager is used by the miner to fill and seal sectors.
+	SectorBuilder piecemanager.PieceManager
 }
 
 // NewSectorStorageSubmodule creates a new sector builder submodule.
