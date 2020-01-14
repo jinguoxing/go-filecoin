@@ -18,7 +18,10 @@ import (
 )
 
 // TODO: lotus sets this value to the value of the Finality constant
-const SealRandomnessLookback = 42
+const SealRandomnessLookbackEpochs = 42
+
+// TODO: figure out where to put this constant
+const InteractivePoRepDelayEpochs = 8
 
 type StorageMinerNodeAPI interface {
 	ChainHeadKey() block.TipSetKey
@@ -236,7 +239,7 @@ func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicke
 		return storage.SealTicket{}, err
 	}
 
-	sampleAt := types.NewBlockHeight(h).Sub(types.NewBlockHeight(SealRandomnessLookback))
+	sampleAt := types.NewBlockHeight(h - SealRandomnessLookbackEpochs)
 
 	r, err := m.api.ChainSampleRandomness(ctx, sampleAt)
 	if err != nil {
@@ -250,7 +253,35 @@ func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicke
 }
 
 func (m *StorageMinerNode) SetSealSeedHandler(ctx context.Context, preCommitMsg cid.Cid, seedAvailFunc func(storage.SealSeed), seedInvalidatedFunc func()) {
-	panic("implement me")
+	// TODO: @acruikshank should this method ever call its handler(s) before
+	// returning?
+	go func() {
+		h, exitCode, err := m.waitForMessageHeight(ctx, preCommitMsg)
+		if err != nil {
+			// TODO: what shall we do with this error, @acruikshank?
+			panic(err)
+		}
+
+		if exitCode != 0 {
+			// TODO: what shall we do with this error, @acruikshank?
+			panic("wrong exit code")
+		}
+
+		sampleAt := types.NewBlockHeight(h + InteractivePoRepDelayEpochs)
+
+		randomness, err := m.api.ChainSampleRandomness(ctx, sampleAt)
+		if err != nil {
+			// TODO: what shall we do with this error, @acruikshank?
+			panic(err)
+		}
+
+		// TODO: handle the failure case in which the chain is rolled back and the
+		// seedInvalidatedFunc is called
+		seedAvailFunc(storage.SealSeed{
+			BlockHeight: sampleAt.AsBigInt().Uint64(),
+			TicketBytes: randomness,
+		})
+	}()
 }
 
 type heightAndExitCode struct {
