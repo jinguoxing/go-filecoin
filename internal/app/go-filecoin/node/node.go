@@ -509,7 +509,7 @@ func initSectorBuilderForNode(ctx context.Context, node *Node) (piecemanager.Pie
 	//	StagedSectorDir:  stagingDir,
 	//}
 
-	sb, err := piecemanager.NewStorageMiner(node, nil, nil)
+	sb, err := piecemanager.NewStorageMiner(nil, nil, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to initialize sector builder for miner %s", minerAddr.String()))
 	}

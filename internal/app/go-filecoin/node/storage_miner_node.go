@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math"
-	"sync"
 
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/abi"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor/builtin/storagemarket"
@@ -30,10 +29,19 @@ type StorageMinerNode struct {
 	maddr  address.Address
 }
 
+var _ storage.NodeAPI = new(StorageMinerNode)
+
+func NewStorageMinerNode(api StorageMinerNodeAPI, workerAddress address.Address, minerAddress address.Address) *StorageMinerNode {
+	return &StorageMinerNode{
+		api:    api,
+		worker: workerAddress,
+		maddr:  minerAddress,
+	}
+}
 func (m *StorageMinerNode) SendSelfDeals(ctx context.Context, pieces ...storage.PieceInfo) (cid.Cid, error) {
-	proposals := make([]storagemarket.StorageDealProposal, len(pieces))
+	proposals := make([]types.StorageDealProposal, len(pieces))
 	for i, piece := range pieces {
-		proposals[i] = storagemarket.StorageDealProposal{
+		proposals[i] = types.StorageDealProposal{
 			PieceRef:             piece.CommP[:],
 			PieceSize:            types.Uint64(piece.Size),
 			Client:               m.worker,
@@ -85,58 +93,168 @@ func (m *StorageMinerNode) SendSelfDeals(ctx context.Context, pieces ...storage.
 	return mcid, nil
 }
 
-func (m *StorageMinerNode) WaitForSelfDeals(ctx context.Context, mcid cid.Cid) ([]uint64, error) {
-	var wg sync.WaitGroup
-	var receipt *types.MessageReceipt
+func (m *StorageMinerNode) WaitForSelfDeals(ctx context.Context, mcid cid.Cid) ([]uint64, uint8, error) {
+	receiptChan := make(chan *types.MessageReceipt)
+	errChan := make(chan error)
 
-	wg.Add(1)
-	go m.api.MessageWait(ctx, mcid, func(b *block.Block, message *types.SignedMessage, r *types.MessageReceipt) error {
-		receipt = r
-		wg.Done()
-		return nil
-	})
+	go func() {
+		err := m.api.MessageWait(ctx, mcid, func(b *block.Block, message *types.SignedMessage, r *types.MessageReceipt) error {
+			receiptChan <- r
+			return nil
+		})
+		if err != nil {
+			errChan <- err
+		}
+	}()
 
-	wg.Wait()
+	select {
+	case receipt := <-receiptChan:
+		if receipt.ExitCode != 0 {
+			return nil, receipt.ExitCode, nil
+		}
 
-	dealIdValues, err := abi.Deserialize(receipt.Return[0], abi.UintArray)
+		dealIdValues, err := abi.Deserialize(receipt.Return[0], abi.UintArray)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		dealIds, ok := dealIdValues.Val.([]uint64)
+		if !ok {
+			return nil, 0, errors.New("Decoded deal ids are not a []uint64")
+		}
+
+		return dealIds, 0, nil
+	case err := <-errChan:
+		return nil, 0, err
+	case <-ctx.Done():
+		return nil, 0, errors.New("context ended prematurely")
+	}
+}
+
+func (m *StorageMinerNode) SendPreCommitSector(ctx context.Context, sectorID uint64, commR []byte, ticket storage.SealTicket, pieces ...storage.Piece) (cid.Cid, error) {
+	dealIds := make([]types.Uint64, len(pieces))
+	for i, piece := range pieces {
+		dealIds[i] = types.Uint64(piece.DealID)
+	}
+
+	info := &types.SectorPreCommitInfo{
+		SectorNumber: types.Uint64(sectorID),
+
+		CommR:     commR,
+		SealEpoch: types.Uint64(ticket.BlockHeight),
+		DealIDs:   dealIds,
+	}
+
+	precommitParams, err := abi.ToEncodedValues(info)
 	if err != nil {
-		return nil, err
+		return cid.Undef, err
 	}
 
-	dealIds, ok := dealIdValues.Val.([]uint64)
-	if !ok {
-		return nil, errors.New("Decoded deal ids are not a []uint64")
+	mcid, cerr, err := m.api.MessageSend(
+		ctx,
+		m.worker,
+		address.StorageMarketAddress,
+		types.ZeroAttoFIL,
+		types.NewGasPrice(1),
+		types.NewGasUnits(300),
+		storagemarket.PreCommitSector,
+		precommitParams,
+	)
+	if err != nil {
+		return cid.Undef, err
 	}
 
-	return dealIds, nil
+	err = <-cerr
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	return mcid, nil
 }
 
-func (StorageMinerNode) SendPreCommitSector(ctx context.Context, sectorID uint64, ticket storage.SealTicket, pieces ...storage.Piece) (cid.Cid, error) {
+func (m *StorageMinerNode) WaitForPreCommitSector(ctx context.Context, mcid cid.Cid) (uint64, uint8, error) {
+	return m.waitForMessageHeight(ctx, mcid)
+}
+
+func (m *StorageMinerNode) SendProveCommitSector(ctx context.Context, sectorID uint64, proof []byte, deals ...uint64) (cid.Cid, error) {
+	dealIds := make([]types.Uint64, len(deals))
+	for i, deal := range deals {
+		dealIds[i] = types.Uint64(deal)
+	}
+
+	info := &types.SectorProveCommitInfo{
+		Proof:    proof,
+		SectorID: types.Uint64(sectorID),
+		DealIDs:  dealIds,
+	}
+
+	commitParams, err := abi.ToEncodedValues(info)
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	mcid, cerr, err := m.api.MessageSend(
+		ctx,
+		m.worker,
+		address.StorageMarketAddress,
+		types.ZeroAttoFIL,
+		types.NewGasPrice(1),
+		types.NewGasUnits(300),
+		storagemarket.CommitSector,
+		commitParams,
+	)
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	err = <-cerr
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	return mcid, nil
+}
+
+func (m *StorageMinerNode) WaitForProveCommitSector(ctx context.Context, mcid cid.Cid) (uint64, uint8, error) {
+	return m.waitForMessageHeight(ctx, mcid)
+}
+
+func (m *StorageMinerNode) GetSealTicket(context.Context) (storage.SealTicket, error) {
 	panic("implement me")
 }
 
-func (StorageMinerNode) WaitForPreCommitSector(context.Context, cid.Cid) (uint64, error) {
+func (m *StorageMinerNode) SetSealSeedHandler(ctx context.Context, preCommitMsg cid.Cid, seedAvailFunc func(storage.SealSeed), seedInvalidatedFunc func()) {
 	panic("implement me")
 }
 
-func (StorageMinerNode) SendProveCommitSector(ctx context.Context, sectorID uint64, proof []byte, dealids ...uint64) (cid.Cid, error) {
-	panic("implement me")
+type heightAndExitCode struct {
+	exitCode uint8
+	height   types.Uint64
 }
 
-func (StorageMinerNode) WaitForProveCommitSector(context.Context, cid.Cid) (uint64, error) {
-	panic("implement me")
-}
+func (m *StorageMinerNode) waitForMessageHeight(ctx context.Context, mcid cid.Cid) (uint64, uint8, error) {
+	height := make(chan heightAndExitCode)
+	errChan := make(chan error)
 
-func (StorageMinerNode) GetSealTicket(context.Context) (storage.SealTicket, error) {
-	panic("implement me")
-}
+	go func() {
+		err := m.api.MessageWait(ctx, mcid, func(b *block.Block, message *types.SignedMessage, r *types.MessageReceipt) error {
+			height <- heightAndExitCode{
+				height:   b.Height,
+				exitCode: r.ExitCode,
+			}
+			return nil
+		})
+		if err != nil {
+			errChan <- err
+		}
+	}()
 
-func (StorageMinerNode) SetSealSeedHandler(ctx context.Context, preCommitMsg cid.Cid, seedAvailFunc func(storage.SealSeed), seedInvalidatedFunc func()) {
-	panic("implement me")
-}
-
-func NewStorageMinernode(api StorageMinerNodeAPI) *StorageMinerNode {
-	return &StorageMinerNode{
-		api: api,
+	select {
+	case h := <-height:
+		return uint64(h.height), h.exitCode, nil
+	case err := <-errChan:
+		return 0, 0, err
+	case <-ctx.Done():
+		return 0, 0, errors.New("context ended prematurely")
 	}
 }

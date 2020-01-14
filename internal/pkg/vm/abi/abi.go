@@ -72,6 +72,10 @@ const (
 	PowerReport
 	// FaultReport is a triple of integers
 	FaultReport
+	// SectorPreCommitInfo are parameters
+	SectorPreCommitInfo
+	// SectorProveCommitInfo are parameters
+	SectorProveCommitInfo
 )
 
 func (t Type) String() string {
@@ -126,6 +130,10 @@ func (t Type) String() string {
 		return "types.PowerReport"
 	case FaultReport:
 		return "types.FaultReport"
+	case SectorPreCommitInfo:
+		return "types.SectorPreCommitInfo"
+	case SectorProveCommitInfo:
+		return "types.SectorProveCommitInfo"
 	default:
 		return "<unknown type>"
 	}
@@ -189,6 +197,10 @@ func (av *Value) String() string {
 		return fmt.Sprint(av.Val.(types.PowerReport))
 	case FaultReport:
 		return fmt.Sprint(av.Val.(types.FaultReport))
+	case SectorPreCommitInfo:
+		return fmt.Sprint(av.Val.(types.SectorPreCommitInfo))
+	case SectorProveCommitInfo:
+		return fmt.Sprint(av.Val.(types.SectorProveCommitInfo))
 	default:
 		return "<unknown type>"
 	}
@@ -369,6 +381,18 @@ func (av *Value) Serialize() ([]byte, error) {
 			return nil, &typeError{types.FaultReport{}, av.Val}
 		}
 		return encoding.Encode(fr)
+	case SectorPreCommitInfo:
+		spci, ok := av.Val.(types.SectorPreCommitInfo)
+		if !ok {
+			return nil, &typeError{types.SectorPreCommitInfo{}, av.Val}
+		}
+		return encoding.Encode(spci)
+	case SectorProveCommitInfo:
+		spci, ok := av.Val.(types.SectorProveCommitInfo)
+		if !ok {
+			return nil, &typeError{types.SectorProveCommitInfo{}, av.Val}
+		}
+		return encoding.Encode(spci)
 	default:
 		return nil, fmt.Errorf("unrecognized Type: %d", av.Type)
 	}
@@ -432,6 +456,10 @@ func ToValues(i []interface{}) ([]*Value, error) {
 			out = append(out, &Value{Type: PowerReport, Val: v})
 		case types.FaultReport:
 			out = append(out, &Value{Type: FaultReport, Val: v})
+		case types.SectorPreCommitInfo:
+			out = append(out, &Value{Type: SectorPreCommitInfo, Val: v})
+		case types.SectorProveCommitInfo:
+			out = append(out, &Value{Type: SectorProveCommitInfo, Val: v})
 		default:
 			return nil, fmt.Errorf("unsupported type: %T", v)
 		}
@@ -632,6 +660,26 @@ func Deserialize(data []byte, t Type) (*Value, error) {
 			Type: t,
 			Val:  fr,
 		}, nil
+	case SectorPreCommitInfo:
+		var spci types.SectorPreCommitInfo
+		err := encoding.Decode(data, &spci)
+		if err != nil {
+			return nil, err
+		}
+		return &Value{
+			Type: t,
+			Val:  spci,
+		}, nil
+	case SectorProveCommitInfo:
+		var spci types.SectorProveCommitInfo
+		err := encoding.Decode(data, &spci)
+		if err != nil {
+			return nil, err
+		}
+		return &Value{
+			Type: t,
+			Val:  spci,
+		}, nil
 	case Invalid:
 		return nil, ErrInvalidType
 	default:
@@ -640,30 +688,32 @@ func Deserialize(data []byte, t Type) (*Value, error) {
 }
 
 var typeTable = map[Type]reflect.Type{
-	Address:         reflect.TypeOf(address.Address{}),
-	AttoFIL:         reflect.TypeOf(types.AttoFIL{}),
-	Bytes:           reflect.TypeOf([]byte{}),
-	BytesAmount:     reflect.TypeOf(&types.BytesAmount{}),
-	ChannelID:       reflect.TypeOf(&types.ChannelID{}),
-	Cid:             reflect.TypeOf(cid.Cid{}),
-	BlockHeight:     reflect.TypeOf(&types.BlockHeight{}),
-	Integer:         reflect.TypeOf(&big.Int{}),
-	String:          reflect.TypeOf(string("")),
-	UintArray:       reflect.TypeOf([]types.Uint64{}),
-	PeerID:          reflect.TypeOf(peer.ID("")),
-	SectorID:        reflect.TypeOf(uint64(0)),
-	CommitmentsMap:  reflect.TypeOf(map[string]types.Commitments{}),
-	Boolean:         reflect.TypeOf(false),
-	ProofsMode:      reflect.TypeOf(types.TestProofsMode),
-	PoRepProof:      reflect.TypeOf(types.PoRepProof{}),
-	PoStProof:       reflect.TypeOf(types.PoStProof{}),
-	Predicate:       reflect.TypeOf(&types.Predicate{}),
-	Parameters:      reflect.TypeOf([]interface{}{}),
-	IntSet:          reflect.TypeOf(types.IntSet{}),
-	MinerPoStStates: reflect.TypeOf(&map[string]uint64{}),
-	FaultSet:        reflect.TypeOf(types.FaultSet{}),
-	PowerReport:     reflect.TypeOf(types.PowerReport{}),
-	FaultReport:     reflect.TypeOf(types.FaultReport{}),
+	Address:               reflect.TypeOf(address.Address{}),
+	AttoFIL:               reflect.TypeOf(types.AttoFIL{}),
+	Bytes:                 reflect.TypeOf([]byte{}),
+	BytesAmount:           reflect.TypeOf(&types.BytesAmount{}),
+	ChannelID:             reflect.TypeOf(&types.ChannelID{}),
+	Cid:                   reflect.TypeOf(cid.Cid{}),
+	BlockHeight:           reflect.TypeOf(&types.BlockHeight{}),
+	Integer:               reflect.TypeOf(&big.Int{}),
+	String:                reflect.TypeOf(string("")),
+	UintArray:             reflect.TypeOf([]types.Uint64{}),
+	PeerID:                reflect.TypeOf(peer.ID("")),
+	SectorID:              reflect.TypeOf(uint64(0)),
+	CommitmentsMap:        reflect.TypeOf(map[string]types.Commitments{}),
+	Boolean:               reflect.TypeOf(false),
+	ProofsMode:            reflect.TypeOf(types.TestProofsMode),
+	PoRepProof:            reflect.TypeOf(types.PoRepProof{}),
+	PoStProof:             reflect.TypeOf(types.PoStProof{}),
+	Predicate:             reflect.TypeOf(&types.Predicate{}),
+	Parameters:            reflect.TypeOf([]interface{}{}),
+	IntSet:                reflect.TypeOf(types.IntSet{}),
+	MinerPoStStates:       reflect.TypeOf(&map[string]uint64{}),
+	FaultSet:              reflect.TypeOf(types.FaultSet{}),
+	PowerReport:           reflect.TypeOf(types.PowerReport{}),
+	FaultReport:           reflect.TypeOf(types.FaultReport{}),
+	SectorPreCommitInfo:   reflect.TypeOf(types.SectorPreCommitInfo{}),
+	SectorProveCommitInfo: reflect.TypeOf(types.SectorProveCommitInfo{}),
 }
 
 // TypeMatches returns whether or not 'val' is the go type expected for the given ABI type

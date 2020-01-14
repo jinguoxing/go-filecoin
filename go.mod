@@ -3,7 +3,6 @@ module github.com/filecoin-project/go-filecoin
 go 1.13
 
 require (
-	bou.ke/monkey v1.0.1 // indirect
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.0
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
@@ -21,7 +20,7 @@ require (
 	github.com/filecoin-project/go-amt-ipld v0.0.0-20190920035751-ae3c37184616
 	github.com/filecoin-project/go-leb128 v0.0.0-20190212224330-8d79a5489543
 	github.com/filecoin-project/go-sectorbuilder v0.0.0-20200109194458-9656ce473254
-	github.com/filecoin-project/go-storage-miner v0.0.0-20200109233201-68496757e9fc
+	github.com/filecoin-project/go-storage-miner v0.0.0-20200114161142-ef0895ae07d3
 	github.com/go-check/check v0.0.0-20190902080502-41f04d3bba15 // indirect
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/golangci/golangci-lint v1.21.0
