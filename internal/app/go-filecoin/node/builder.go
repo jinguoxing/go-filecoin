@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -220,7 +221,9 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 		return nil, errors.Wrap(err, "failed to build node.BlockMining")
 	}
 
-	nd.PieceManager, err = submodule.NewPieceManagerSubmodule(ctx)
+	waiter := msg.NewWaiter(nd.chain.ChainReader, nd.chain.MessageStore, nd.Blockstore.Blockstore, nd.Blockstore.CborStore)
+
+	nd.PieceManager, err = submodule.NewPieceManagerSubmodule(ctx, address.Undef, address.Undef, nil, nil, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build node.PieceManager")
 	}
@@ -245,7 +248,7 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 		MsgPool:       nd.Messaging.MsgPool,
 		MsgPreviewer:  msg.NewPreviewer(nd.chain.ChainReader, nd.Blockstore.CborStore, nd.Blockstore.Blockstore, nd.chain.Processor),
 		ActState:      nd.chain.ActorState,
-		MsgWaiter:     msg.NewWaiter(nd.chain.ChainReader, nd.chain.MessageStore, nd.Blockstore.Blockstore, nd.Blockstore.CborStore),
+		MsgWaiter:     waiter,
 		Network:       nd.network.Network,
 		Outbox:        nd.Messaging.Outbox,
 		SectorBuilder: nd.SectorBuilder,

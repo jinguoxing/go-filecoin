@@ -3,7 +3,7 @@ package verification
 import (
 	"context"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-sectorbuilder"
+	sectorbuilder "github.com/filecoin-project/go-sectorbuilder"
 )
 
 // RustVerifier provides proof-verification methods.
@@ -18,7 +18,7 @@ func (rp *RustVerifier) VerifySeal(req VerifySealRequest) (VerifySealResponse, e
 	if err != nil {
 		return VerifySealResponse{}, err
 	}
-	isValid, err := sectorbuilder.VerifySeal(req.SectorSize.Uint64(), req.CommR[:], req.CommD[:], prover, req.Ticket, req.Seed, req.SectorID, req.Proof)
+	isValid, err := sectorbuilder.ProofVerifier.VerifySeal(req.SectorSize.Uint64(), req.CommR[:], req.CommD[:], prover, req.Ticket, req.Seed, req.SectorID, req.Proof)
 	if err != nil {
 		return VerifySealResponse{}, err
 	}
@@ -35,7 +35,7 @@ func (rp *RustVerifier) VerifyFallbackPoSt(ctx context.Context, req VerifyPoStRe
 		return VerifyPoStResponse{}, err
 	}
 
-	isValid, err := sectorbuilder.VerifyFallbackPost(ctx, req.SectorSize.Uint64(), req.SortedSectorInfo, req.ChallengeSeed[:], req.Proof, req.Candidates, sbAddress, uint64(len(req.Faults)))
+	isValid, err := sectorbuilder.ProofVerifier.VerifyFallbackPost(ctx, req.SectorSize.Uint64(), req.SortedSectorInfo, req.ChallengeSeed[:], req.Proof, req.Candidates, sbAddress, uint64(len(req.Faults)))
 	if err != nil {
 		return VerifyPoStResponse{}, err
 	}
