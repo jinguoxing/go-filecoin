@@ -71,10 +71,10 @@ type Node struct {
 	// Subsystems
 	//
 
-	chain         submodule.ChainSubmodule
-	syncer        submodule.SyncerSubmodule
-	BlockMining   submodule.BlockMiningSubmodule
-	SectorStorage submodule.SectorBuilderSubmodule
+	chain        submodule.ChainSubmodule
+	syncer       submodule.SyncerSubmodule
+	BlockMining  submodule.BlockMiningSubmodule
+	PieceManager submodule.PieceManagerSubmodule
 
 	//
 	// Supporting services
@@ -220,7 +220,7 @@ func (node *Node) setupSectorBuilder(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize sector builder")
 	}
-	node.SectorStorage.SectorBuilder = sectorBuilder
+	node.PieceManager.PieceManager = sectorBuilder
 
 	return nil
 }
@@ -319,7 +319,7 @@ func (node *Node) Stop(ctx context.Context) {
 		if err := node.SectorBuilder().Close(); err != nil {
 			fmt.Printf("error closing sector builder: %s\n", err)
 		}
-		node.SectorStorage.SectorBuilder = nil
+		node.PieceManager.PieceManager = nil
 	}
 
 	if err := node.Host().Close(); err != nil {
@@ -693,7 +693,7 @@ func (node *Node) Host() host.Host {
 
 // PieceManager returns the nodes sectorBuilder.
 func (node *Node) SectorBuilder() piecemanager.PieceManager {
-	return node.SectorStorage.SectorBuilder
+	return node.PieceManager.PieceManager
 }
 
 // BlockService returns the nodes blockservice.

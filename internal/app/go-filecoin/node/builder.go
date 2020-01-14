@@ -220,9 +220,9 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 		return nil, errors.Wrap(err, "failed to build node.BlockMining")
 	}
 
-	nd.SectorStorage, err = submodule.NewSectorStorageSubmodule(ctx)
+	nd.PieceManager, err = submodule.NewPieceManagerSubmodule(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build node.SectorStorage")
+		return nil, errors.Wrap(err, "failed to build node.PieceManager")
 	}
 
 	nd.StorageProtocol, err = submodule.NewStorageProtocolSubmodule(ctx)
