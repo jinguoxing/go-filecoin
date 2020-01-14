@@ -5,18 +5,24 @@ import (
 	"errors"
 	"math"
 
-	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/abi"
-	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor/builtin/storagemarket"
+	"github.com/filecoin-project/go-storage-miner"
+	"github.com/ipfs/go-cid"
 	"github.com/polydawn/refmt/cbor"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/abi"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor/builtin/storagemarket"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
-	"github.com/filecoin-project/go-storage-miner"
-	"github.com/ipfs/go-cid"
 )
 
+// TODO: lotus sets this value to the value of the Finality constant
+const SealRandomnessLookback = 42
+
 type StorageMinerNodeAPI interface {
+	ChainHeadKey() block.TipSetKey
+	ChainTipSet(key block.TipSetKey) (block.TipSet, error)
 	ChainSampleRandomness(ctx context.Context, sampleHeight *types.BlockHeight) ([]byte, error)
 	MessageSend(ctx context.Context, from, to address.Address, value types.AttoFIL, gasPrice types.AttoFIL, gasLimit types.GasUnits, method types.MethodID, params ...interface{}) (cid.Cid, chan error, error)
 	MessageWait(ctx context.Context, msgCid cid.Cid, cb func(*block.Block, *types.SignedMessage, *types.MessageReceipt) error) error
@@ -219,8 +225,28 @@ func (m *StorageMinerNode) WaitForProveCommitSector(ctx context.Context, mcid ci
 	return m.waitForMessageHeight(ctx, mcid)
 }
 
-func (m *StorageMinerNode) GetSealTicket(context.Context) (storage.SealTicket, error) {
-	panic("implement me")
+func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicket, error) {
+	ts, err := m.api.ChainTipSet(m.api.ChainHeadKey())
+	if err != nil {
+		return storage.SealTicket{}, xerrors.Errorf("getting head ts for SealTicket failed: %w", err)
+	}
+
+	h, err := ts.Height()
+	if err != nil {
+		return storage.SealTicket{}, err
+	}
+
+	sampleAt := types.NewBlockHeight(h).Sub(types.NewBlockHeight(SealRandomnessLookback))
+
+	r, err := m.api.ChainSampleRandomness(ctx, sampleAt)
+	if err != nil {
+		return storage.SealTicket{}, xerrors.Errorf("getting randomness for SealTicket failed: %w", err)
+	}
+
+	return storage.SealTicket{
+		BlockHeight: h,
+		TicketBytes: r,
+	}, nil
 }
 
 func (m *StorageMinerNode) SetSealSeedHandler(ctx context.Context, preCommitMsg cid.Cid, seedAvailFunc func(storage.SealSeed), seedInvalidatedFunc func()) {
