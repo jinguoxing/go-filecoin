@@ -5,6 +5,8 @@ import (
 	"errors"
 	"math"
 
+	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/plumbing/msg"
+
 	"github.com/filecoin-project/go-storage-miner"
 	"github.com/ipfs/go-cid"
 	"github.com/polydawn/refmt/cbor"
@@ -23,28 +25,26 @@ const SealRandomnessLookbackEpochs = 42
 // TODO: figure out where to put this constant
 const InteractivePoRepDelayEpochs = 8
 
-type StorageMinerNodeAPI interface {
-	ChainHeadKey() block.TipSetKey
-	ChainTipSet(key block.TipSetKey) (block.TipSet, error)
-	ChainSampleRandomness(ctx context.Context, sampleHeight *types.BlockHeight) ([]byte, error)
-	MessageSend(ctx context.Context, from, to address.Address, value types.AttoFIL, gasPrice types.AttoFIL, gasLimit types.GasUnits, method types.MethodID, params ...interface{}) (cid.Cid, chan error, error)
-	MessageWait(ctx context.Context, msgCid cid.Cid, cb func(*block.Block, *types.SignedMessage, *types.MessageReceipt) error) error
-	SignBytes(data []byte, addr address.Address) (types.Signature, error)
-}
-
 type StorageMinerNode struct {
-	api    StorageMinerNodeAPI
-	worker address.Address
-	maddr  address.Address
+	minerAddr  address.Address
+	workerAddr address.Address
+
+	chain     *ChainSubmodule
+	messaging *MessagingSubmodule
+	msgWaiter *msg.Waiter
+	wallet    *WalletSubmodule
 }
 
 var _ storage.NodeAPI = new(StorageMinerNode)
 
-func NewStorageMinerNode(api StorageMinerNodeAPI, workerAddress address.Address, minerAddress address.Address) *StorageMinerNode {
+func NewStorageMinerNode(minerAddress address.Address, workerAddress address.Address, c *ChainSubmodule, m *MessagingSubmodule, mw *msg.Waiter, w *WalletSubmodule) *StorageMinerNode {
 	return &StorageMinerNode{
-		api:    api,
-		worker: workerAddress,
-		maddr:  minerAddress,
+		minerAddr:  minerAddress,
+		workerAddr: workerAddress,
+		chain:      c,
+		messaging:  m,
+		msgWaiter:  mw,
+		wallet:     w,
 	}
 }
 func (m *StorageMinerNode) SendSelfDeals(ctx context.Context, pieces ...storage.PieceInfo) (cid.Cid, error) {
@@ -53,8 +53,8 @@ func (m *StorageMinerNode) SendSelfDeals(ctx context.Context, pieces ...storage.
 		proposals[i] = types.StorageDealProposal{
 			PieceRef:             piece.CommP[:],
 			PieceSize:            types.Uint64(piece.Size),
-			Client:               m.worker,
-			Provider:             m.maddr,
+			Client:               m.workerAddr,
+			Provider:             m.minerAddr,
 			ProposalExpiration:   math.MaxUint64,
 			Duration:             math.MaxUint64 / 2, // /2 because overflows
 			StoragePricePerEpoch: 0,
@@ -67,7 +67,7 @@ func (m *StorageMinerNode) SendSelfDeals(ctx context.Context, pieces ...storage.
 			return cid.Undef, err
 		}
 
-		sig, err := m.api.SignBytes(proposalBytes, m.worker)
+		sig, err := m.wallet.Wallet.SignBytes(proposalBytes, m.workerAddr)
 		if err != nil {
 			return cid.Undef, err
 		}
@@ -80,13 +80,14 @@ func (m *StorageMinerNode) SendSelfDeals(ctx context.Context, pieces ...storage.
 		return cid.Undef, err
 	}
 
-	mcid, cerr, err := m.api.MessageSend(
+	mcid, cerr, err := m.messaging.Outbox.Send(
 		ctx,
-		m.worker,
+		m.workerAddr,
 		address.StorageMarketAddress,
 		types.ZeroAttoFIL,
 		types.NewGasPrice(1),
 		types.NewGasUnits(300),
+		true,
 		storagemarket.PublishStorageDeals,
 		dealParams,
 	)
@@ -107,7 +108,7 @@ func (m *StorageMinerNode) WaitForSelfDeals(ctx context.Context, mcid cid.Cid) (
 	errChan := make(chan error)
 
 	go func() {
-		err := m.api.MessageWait(ctx, mcid, func(b *block.Block, message *types.SignedMessage, r *types.MessageReceipt) error {
+		err := m.msgWaiter.Wait(ctx, mcid, func(b *block.Block, message *types.SignedMessage, r *types.MessageReceipt) error {
 			receiptChan <- r
 			return nil
 		})
@@ -159,13 +160,14 @@ func (m *StorageMinerNode) SendPreCommitSector(ctx context.Context, sectorID uin
 		return cid.Undef, err
 	}
 
-	mcid, cerr, err := m.api.MessageSend(
+	mcid, cerr, err := m.messaging.Outbox.Send(
 		ctx,
-		m.worker,
-		address.StorageMarketAddress,
+		m.workerAddr,
+		m.minerAddr,
 		types.ZeroAttoFIL,
 		types.NewGasPrice(1),
 		types.NewGasUnits(300),
+		true,
 		storagemarket.PreCommitSector,
 		precommitParams,
 	)
@@ -202,13 +204,14 @@ func (m *StorageMinerNode) SendProveCommitSector(ctx context.Context, sectorID u
 		return cid.Undef, err
 	}
 
-	mcid, cerr, err := m.api.MessageSend(
+	mcid, cerr, err := m.messaging.Outbox.Send(
 		ctx,
-		m.worker,
-		address.StorageMarketAddress,
+		m.workerAddr,
+		m.minerAddr,
 		types.ZeroAttoFIL,
 		types.NewGasPrice(1),
 		types.NewGasUnits(300),
+		true,
 		storagemarket.CommitSector,
 		commitParams,
 	)
@@ -229,7 +232,7 @@ func (m *StorageMinerNode) WaitForProveCommitSector(ctx context.Context, mcid ci
 }
 
 func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicket, error) {
-	ts, err := m.api.ChainTipSet(m.api.ChainHeadKey())
+	ts, err := m.chain.ChainReader.GetTipSet(m.chain.ChainReader.GetHead())
 	if err != nil {
 		return storage.SealTicket{}, xerrors.Errorf("getting head ts for SealTicket failed: %w", err)
 	}
@@ -241,7 +244,7 @@ func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicke
 
 	sampleAt := types.NewBlockHeight(h - SealRandomnessLookbackEpochs)
 
-	r, err := m.api.ChainSampleRandomness(ctx, sampleAt)
+	r, err := m.chain.State.SampleRandomness(ctx, sampleAt)
 	if err != nil {
 		return storage.SealTicket{}, xerrors.Errorf("getting randomness for SealTicket failed: %w", err)
 	}
@@ -269,7 +272,7 @@ func (m *StorageMinerNode) SetSealSeedHandler(ctx context.Context, preCommitMsg 
 
 		sampleAt := types.NewBlockHeight(h + InteractivePoRepDelayEpochs)
 
-		randomness, err := m.api.ChainSampleRandomness(ctx, sampleAt)
+		randomness, err := m.chain.State.SampleRandomness(ctx, sampleAt)
 		if err != nil {
 			// TODO: what shall we do with this error, @acruikshank?
 			panic(err)
@@ -294,7 +297,7 @@ func (m *StorageMinerNode) waitForMessageHeight(ctx context.Context, mcid cid.Ci
 	errChan := make(chan error)
 
 	go func() {
-		err := m.api.MessageWait(ctx, mcid, func(b *block.Block, message *types.SignedMessage, r *types.MessageReceipt) error {
+		err := m.msgWaiter.Wait(ctx, mcid, func(b *block.Block, message *types.SignedMessage, r *types.MessageReceipt) error {
 			height <- heightAndExitCode{
 				height:   b.Height,
 				exitCode: r.ExitCode,

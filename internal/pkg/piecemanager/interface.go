@@ -3,28 +3,25 @@ package piecemanager
 import (
 	"context"
 	"io"
-
-	"github.com/ipfs/go-cid"
 )
 
-// PieceManager provides an interface through which user piece-bytes can be
-// written, sealed into sectors, and later unsealed and read.
 type PieceManager interface {
-	// AddPiece writes the given piece into an unsealed sector and returns the
-	// id of that sector. This method has a race; it is possible that the
-	// sector into which the piece-bytes were written is sealed before this
-	// method returns. In the real world this should not happen, as sealing
-	// takes a long time to complete. In tests, where sealing happens
-	// near-instantaneously, it is possible to exercise this race.
-	AddPiece(ctx context.Context, dealID uint64, pieceSize uint64, pieceReader io.Reader) (sectorID uint64, err error)
+	// SealPieceIntoNewSector writes the provided piece into a sector and fills
+	// the remaining space in the sector with self deal-data. The now-filled
+	// sector is encoded and, when the required bits of chain randomness are
+	// available, committed to the network. This method is fire-and-forget; any
+	// errors encountered during the pre-commit or commit flows (including
+	// message creation) are recorded in PieceManager metadata but not exposed
+	// through this API.
+	SealPieceIntoNewSector(ctx context.Context, dealID uint64, pieceSize uint64, pieceReader io.Reader) error
 
-	// ReadPieceFromSealedSector produces a Reader used to get original
-	// piece-bytes from a sealed sector.
-	ReadPieceFromSealedSector(pieceCid cid.Cid) (io.Reader, error)
+	// UnsealSector produces a reader to the unsealed bytes associated with the
+	// provided sector id, or an error if no such sealed sector exists. The
+	// bytes produced by the Reader will not include any bit-padding.
+	UnsealSector(ctx context.Context, sectorId uint64) (io.ReadCloser, error)
 
-	// Close signals that this PieceManager is no longer in use. PieceManager
-	// metadata will not be deleted when Close is called; an equivalent
-	// PieceManager can be created later by applying the Init function to the
-	// arguments used to create the instance being closed.
-	Close() error
+	// LocatePieceWithinSector produces information about the location of a
+	// deal's piece within a sealed sector, or an error if that piece does not
+	// exist within any sealed sectors.
+	LocatePieceWithinSector(ctx context.Context, dealID uint64) (sectorID uint64, offset uint64, length uint64, err error)
 }
