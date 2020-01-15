@@ -13,6 +13,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
+	"github.com/filecoin-project/go-filecoin/internal/pkg/chain"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/abi"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor/builtin/storagemarket"
@@ -22,8 +23,105 @@ import (
 // TODO: lotus sets this value to the value of the Finality constant
 const SealRandomnessLookbackEpochs = 42
 
-// TODO: figure out where to put this constant
-const InteractivePoRepDelayEpochs = 8
+type ChainSampler func(ctx context.Context, sampleHeight *types.BlockHeight) ([]byte, error)
+
+type StorageMinerNodeAPI interface {
+	ChainHeadKey() block.TipSetKey
+	ChainTipSet(key block.TipSetKey) (block.TipSet, error)
+	CollectTipsToCommonAncestor(ctx context.Context, store chain.TipSetProvider, oldHead, newHead block.TipSet) (oldTips, newTips []block.TipSet, err error)
+	ChainSamplerRandomness(ctx context.Context, sampleHeight *types.BlockHeight) ([]byte, error)
+	MessageSend(ctx context.Context, from, to address.Address, value types.AttoFIL, gasPrice types.AttoFIL, gasLimit types.GasUnits, method types.MethodID, params ...interface{}) (cid.Cid, chan error, error)
+	MessageWait(ctx context.Context, msgCid cid.Cid, cb func(*block.Block, *types.SignedMessage, *types.MessageReceipt) error) error
+	SignBytes(data []byte, addr address.Address) (types.Signature, error)
+}
+
+type heightThresholdListener struct {
+	target    uint64
+	targetHit bool
+	seedCh    chan storage.SealSeed
+	errCh     chan error
+	invalidCh chan struct{}
+	doneCh    chan struct{}
+}
+
+// handle a chain update by sending appropriate status messages back to the channels.
+// newChain is all the tipsets that are new since the last head update.
+// Normally, this will be a single tipset, but in the case of a re-org it will contain
+// All the common ancestors of the new tipset to the greatest common ancestor.
+// Returns false if this handler is no longer valid
+func (l heightThresholdListener) handle(ctx context.Context, chain []block.TipSet, sampler ChainSampler) (bool, error) {
+	if len(chain) < 1 {
+		return true, nil
+	}
+
+	h, err := chain[0].Height()
+	if err != nil {
+		return true, err
+	}
+
+	// check if we've hit finality and should stop listening
+	if h >= l.target+SealRandomnessLookbackEpochs {
+		return false, nil
+	}
+
+	lcaHeight, err := chain[len(chain)-1].Height()
+	if err != nil {
+		return true, err
+	}
+
+	// if we have already seen a target tipset
+	if l.targetHit {
+		// if we've completely reverted
+		if h < l.target {
+			l.invalidCh <- struct{}{}
+			l.targetHit = false
+			// if we've re-orged to a point before the target
+		} else if lcaHeight < l.target {
+			l.invalidCh <- struct{}{}
+			l.sendRandomness(ctx, chain, sampler)
+		}
+		return true, nil
+	}
+
+	// otherwise send randomness if we've hit the height
+	if h >= l.target {
+		l.targetHit = true
+		l.sendRandomness(ctx, chain, sampler)
+	}
+	return true, nil
+}
+
+func (l heightThresholdListener) sendRandomness(ctx context.Context, chain []block.TipSet, sampler ChainSampler) error {
+	// assume chain not empty and first tipset height greater than target
+	firstTargetTipset := chain[0]
+	for _, ts := range chain {
+		h, err := ts.Height()
+		if err != nil {
+			return err
+		}
+
+		if h < l.target {
+			break
+		}
+		firstTargetTipset = ts
+	}
+
+	tsHeight, err := firstTargetTipset.Height()
+	if err != nil {
+		return err
+	}
+
+	randomness, err := sampler(ctx, types.NewBlockHeight(tsHeight))
+	if err != nil {
+		return err
+	}
+
+	l.seedCh <- storage.SealSeed{
+		BlockHeight: tsHeight,
+		TicketBytes: randomness,
+	}
+	return nil
+}
 
 type StorageMinerNode struct {
 	minerAddr  address.Address
@@ -47,6 +145,56 @@ func NewStorageMinerNode(minerAddress address.Address, workerAddress address.Add
 		wallet:     w,
 	}
 }
+
+func (m *StorageMinerNode) StartHeightListener(ctx context.Context, htc <-chan interface{}) {
+	go func() {
+		var previousHead block.TipSet
+		for {
+			select {
+			case <-htc:
+				head, err := m.handleNewTipSet(ctx, previousHead)
+				if err != nil {
+					log.Warn("failed to handle new tipset")
+				} else {
+					previousHead = head
+				}
+			case heightListener := <-m.newListener:
+				m.heightListeners = append(m.heightListeners, heightListener)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (m *StorageMinerNode) handleNewTipSet(ctx context.Context, previousHead block.TipSet) (block.TipSet, error) {
+	newHeadKey := m.api.ChainHeadKey()
+	newHead, err := m.api.ChainTipSet(newHeadKey)
+	if err != nil {
+		return block.TipSet{}, err
+	}
+
+	_, newTips, err := m.api.CollectTipsToCommonAncestor(ctx, m.tipSetProvider, previousHead, newHead)
+	if err != nil {
+		return block.TipSet{}, err
+	}
+
+	newListeners := make([]heightThresholdListener, len(m.heightListeners))
+	for _, listener := range m.heightListeners {
+		valid, err := listener.handle(ctx, newTips, m.api.ChainSamplerRandomness)
+		if err != nil {
+			log.Error("Error checking storage miner chain listener", err)
+		}
+
+		if valid {
+			newListeners = append(newListeners, listener)
+		}
+	}
+	m.heightListeners = newListeners
+
+	return newHead, nil
+}
+
 func (m *StorageMinerNode) SendSelfDeals(ctx context.Context, pieces ...storage.PieceInfo) (cid.Cid, error) {
 	proposals := make([]types.StorageDealProposal, len(pieces))
 	for i, piece := range pieces {
@@ -242,7 +390,10 @@ func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicke
 		return storage.SealTicket{}, err
 	}
 
-	sampleAt := types.NewBlockHeight(h - SealRandomnessLookbackEpochs)
+	go func() {
+		m.newListener <- 
+	}()
+
 
 	r, err := m.chain.State.SampleRandomness(ctx, sampleAt)
 	if err != nil {
@@ -255,36 +406,39 @@ func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicke
 	}, nil
 }
 
-func (m *StorageMinerNode) SetSealSeedHandler(ctx context.Context, preCommitMsg cid.Cid, seedAvailFunc func(storage.SealSeed), seedInvalidatedFunc func()) {
-	// TODO: @acruikshank should this method ever call its handler(s) before
-	// returning?
+func (m *StorageMinerNode) GetSealSeed(ctx context.Context, preCommitMsg cid.Cid, interval uint64) (seed <-chan storage.SealSeed, err <-chan error, invalidated <-chan struct{}, done <-chan struct{}) {
+	sc := make(chan storage.SealSeed)
+	ec := make(chan error)
+	ic := make(chan struct{})
+	dc := make(chan struct{})
 	go func() {
 		h, exitCode, err := m.waitForMessageHeight(ctx, preCommitMsg)
 		if err != nil {
-			// TODO: what shall we do with this error, @acruikshank?
-			panic(err)
+			ec <- err
+			return
 		}
 
 		if exitCode != 0 {
-			// TODO: what shall we do with this error, @acruikshank?
-			panic("wrong exit code")
+			ec <- xerrors.Errorf("non-zero exit code for pre-commit message %d", exitCode)
+			return
 		}
 
-		sampleAt := types.NewBlockHeight(h + InteractivePoRepDelayEpochs)
+		sampleAt := types.NewBlockHeight(h + interval)
 
 		randomness, err := m.chain.State.SampleRandomness(ctx, sampleAt)
 		if err != nil {
-			// TODO: what shall we do with this error, @acruikshank?
-			panic(err)
+			ec <- err
+			return
 		}
 
 		// TODO: handle the failure case in which the chain is rolled back and the
 		// seedInvalidatedFunc is called
-		seedAvailFunc(storage.SealSeed{
+		sc <- storage.SealSeed{
 			BlockHeight: sampleAt.AsBigInt().Uint64(),
 			TicketBytes: randomness,
-		})
+		}
 	}()
+	return sc, ec, ic, dc
 }
 
 type heightAndExitCode struct {
