@@ -25,19 +25,10 @@ const SealRandomnessLookbackEpochs = 42
 
 type ChainSampler func(ctx context.Context, sampleHeight *types.BlockHeight) ([]byte, error)
 
-type StorageMinerNodeAPI interface {
-	ChainHeadKey() block.TipSetKey
-	ChainTipSet(key block.TipSetKey) (block.TipSet, error)
-	CollectTipsToCommonAncestor(ctx context.Context, store chain.TipSetProvider, oldHead, newHead block.TipSet) (oldTips, newTips []block.TipSet, err error)
-	ChainSamplerRandomness(ctx context.Context, sampleHeight *types.BlockHeight) ([]byte, error)
-	MessageSend(ctx context.Context, from, to address.Address, value types.AttoFIL, gasPrice types.AttoFIL, gasLimit types.GasUnits, method types.MethodID, params ...interface{}) (cid.Cid, chan error, error)
-	MessageWait(ctx context.Context, msgCid cid.Cid, cb func(*block.Block, *types.SignedMessage, *types.MessageReceipt) error) error
-	SignBytes(data []byte, addr address.Address) (types.Signature, error)
-}
-
 type heightThresholdListener struct {
 	target    uint64
 	targetHit bool
+
 	seedCh    chan storage.SealSeed
 	errCh     chan error
 	invalidCh chan struct{}
@@ -124,8 +115,10 @@ func (l heightThresholdListener) sendRandomness(ctx context.Context, chain []blo
 }
 
 type StorageMinerNode struct {
-	minerAddr  address.Address
-	workerAddr address.Address
+	minerAddr       address.Address
+	workerAddr      address.Address
+	newListener     chan heightThresholdListener
+	heightListeners []heightThresholdListener
 
 	chain     *ChainSubmodule
 	messaging *MessagingSubmodule
@@ -168,20 +161,20 @@ func (m *StorageMinerNode) StartHeightListener(ctx context.Context, htc <-chan i
 }
 
 func (m *StorageMinerNode) handleNewTipSet(ctx context.Context, previousHead block.TipSet) (block.TipSet, error) {
-	newHeadKey := m.api.ChainHeadKey()
-	newHead, err := m.api.ChainTipSet(newHeadKey)
+	newHeadKey := m.chain.ChainReader.GetHead()
+	newHead, err := m.chain.ChainReader.GetTipSet(newHeadKey)
 	if err != nil {
 		return block.TipSet{}, err
 	}
 
-	_, newTips, err := m.api.CollectTipsToCommonAncestor(ctx, m.tipSetProvider, previousHead, newHead)
+	_, newTips, err := chain.CollectTipsToCommonAncestor(ctx, m.chain.ChainReader, previousHead, newHead)
 	if err != nil {
 		return block.TipSet{}, err
 	}
 
 	newListeners := make([]heightThresholdListener, len(m.heightListeners))
 	for _, listener := range m.heightListeners {
-		valid, err := listener.handle(ctx, newTips, m.api.ChainSamplerRandomness)
+		valid, err := listener.handle(ctx, newTips, m.chain.State.SampleRandomness)
 		if err != nil {
 			log.Error("Error checking storage miner chain listener", err)
 		}
@@ -390,12 +383,7 @@ func (m *StorageMinerNode) GetSealTicket(ctx context.Context) (storage.SealTicke
 		return storage.SealTicket{}, err
 	}
 
-	go func() {
-		m.newListener <- 
-	}()
-
-
-	r, err := m.chain.State.SampleRandomness(ctx, sampleAt)
+	r, err := m.chain.State.SampleRandomness(ctx, types.NewBlockHeight(h))
 	if err != nil {
 		return storage.SealTicket{}, xerrors.Errorf("getting randomness for SealTicket failed: %w", err)
 	}
@@ -423,19 +411,13 @@ func (m *StorageMinerNode) GetSealSeed(ctx context.Context, preCommitMsg cid.Cid
 			return
 		}
 
-		sampleAt := types.NewBlockHeight(h + interval)
-
-		randomness, err := m.chain.State.SampleRandomness(ctx, sampleAt)
-		if err != nil {
-			ec <- err
-			return
-		}
-
-		// TODO: handle the failure case in which the chain is rolled back and the
-		// seedInvalidatedFunc is called
-		sc <- storage.SealSeed{
-			BlockHeight: sampleAt.AsBigInt().Uint64(),
-			TicketBytes: randomness,
+		m.newListener <- heightThresholdListener{
+			target:    h + interval,
+			targetHit: false,
+			seedCh:    sc,
+			errCh:     ec,
+			invalidCh: ic,
+			doneCh:    dc,
 		}
 	}()
 	return sc, ec, ic, dc
