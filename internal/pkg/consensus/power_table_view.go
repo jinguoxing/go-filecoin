@@ -3,6 +3,8 @@ package consensus
 import (
 	"context"
 
+	ffi "github.com/filecoin-project/filecoin-ffi"
+
 	"github.com/pkg/errors"
 
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
@@ -96,22 +98,22 @@ func (v PowerTableView) HasPower(ctx context.Context, mAddr address.Address) (bo
 }
 
 // SortedSectorInfos returns the sector information for the given miner
-func (v PowerTableView) SortedSectorInfos(ctx context.Context, mAddr address.Address) (sector.SortedSectorInfo, error) {
+func (v PowerTableView) SortedSectorInfos(ctx context.Context, mAddr address.Address) (sector.SortedPublicSectorInfo, error) {
 	// Dragons: once we have a real VM we must get the sector infos from the
 	// miner actor.  For now we return a fake constant.
-	var fakeCommR1, fakeCommR2 [sector.CommitmentBytesLen]byte
+	var fakeCommR1, fakeCommR2 [ffi.CommitmentBytesLen]byte
 	fakeCommR1[0], fakeCommR1[1] = 0xa, 0xb
 	fakeCommR2[0], fakeCommR2[1] = 0xc, 0xd
 	sectorID1, sectorID2 := uint64(0), uint64(1)
 
-	psi1 := sector.SectorInfo{
+	psi1 := ffi.PublicSectorInfo{
 		SectorID: sectorID1,
 		CommR:    fakeCommR1,
 	}
-	psi2 := sector.SectorInfo{
+	psi2 := ffi.PublicSectorInfo{
 		SectorID: sectorID2,
 		CommR:    fakeCommR2,
 	}
 
-	return sector.NewSortedSectorInfo(psi1, psi2), nil
+	return ffi.NewSortedPublicSectorInfo(psi1, psi2), nil
 }
