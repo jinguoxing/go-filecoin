@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	ffi "github.com/filecoin-project/filecoin-ffi"
+
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/discovery"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/encoding/gen"
@@ -85,7 +87,7 @@ func main() {
 	}
 
 	if err := gen.WriteToFile(filepath.Join(base, "proofs/sectorbuilder/sectorbuilder_encoding_gen.go"), gen.IpldCborTypeEncodingGenerator{}, "sectorbuilder",
-		piecemanager.PieceInfo{}, // proofs/sectorbuilder/interface.go
+		ffi.PublicPieceInfo{},
 	); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

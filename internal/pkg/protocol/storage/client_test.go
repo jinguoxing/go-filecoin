@@ -19,7 +19,6 @@ import (
 	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/porcelain"
 	. "github.com/filecoin-project/go-filecoin/internal/pkg/protocol/storage"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/protocol/storage/storagedeal"
-	th "github.com/filecoin-project/go-filecoin/internal/pkg/testhelpers"
 	tf "github.com/filecoin-project/go-filecoin/internal/pkg/testhelpers/testflags"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/util/convert"
@@ -58,8 +57,7 @@ func TestProposeDeal(t *testing.T) {
 		return resp, nil
 	})
 
-	client := NewClient(th.NewFakeHost(), testAPI)
-	client.ProtocolRequestFunc = testNode.MakeTestProtocolRequest
+	client := NewClient()
 
 	dataCid := types.CidFromString(t, "somecid")
 
@@ -136,8 +134,8 @@ func TestProposeZeroPriceDeal(t *testing.T) {
 	testAPI := newTestClientAPI(t, pieceReader, pieceSize)
 	testAPI.askPrice = types.ZeroAttoFIL
 
-	client := NewClient(th.NewFakeHost(), testAPI)
-	testNode := newTestClientNode(func(request interface{}) (interface{}, error) {
+	client := NewClient()
+	newTestClientNode(func(request interface{}) (interface{}, error) {
 		p := request.(*storagedeal.SignedProposal)
 
 		// assert that client does not send payment information in deal
@@ -161,7 +159,6 @@ func TestProposeZeroPriceDeal(t *testing.T) {
 		require.NoError(t, resp.Sign(testAPI.signer, testAPI.worker))
 		return resp, nil
 	})
-	client.ProtocolRequestFunc = testNode.MakeTestProtocolRequest
 
 	_, err := client.ProposeDeal(ctx, addressCreator(), types.CidFromString(t, "somecid"), uint64(67), uint64(10000), false)
 	require.NoError(t, err)
@@ -196,8 +193,7 @@ func TestProposeDealFailsWhenADealAlreadyExists(t *testing.T) {
 		return resp, nil
 	})
 
-	client := NewClient(th.NewFakeHost(), testAPI)
-	client.ProtocolRequestFunc = testNode.MakeTestProtocolRequest
+	client := NewClient()
 
 	dataCid := types.CidFromString(t, "somecid")
 
@@ -240,8 +236,7 @@ func TestProposeDealFailsWhenSignatureIsInvalid(t *testing.T) {
 		return resp, nil
 	})
 
-	client := NewClient(th.NewFakeHost(), testAPI)
-	client.ProtocolRequestFunc = testNode.MakeTestProtocolRequest
+	client := NewClient()
 
 	dataCid := types.CidFromString(t, "somecid")
 

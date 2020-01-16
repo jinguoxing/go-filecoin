@@ -1061,13 +1061,13 @@ func (a *Impl) SubmitPoSt(ctx invocationContext, poStProof types.PoStProof, faul
 			//	return nil, errors.RevertErrorWrap(err, "failed to sample chain for challenge seed")
 			//}
 
-			//var sectorInfos []go_sectorbuilder.SectorInfo
+			//var sectorInfos []ffi.PublicSectorInfo
 			//for _, id := range state.ProvingSet.Values() {
 			//	commitment, found := state.SectorCommitments.Get(id)
 			//	if !found {
 			//		return nil, errors.NewFaultErrorf("miner ProvingSet sector id %d missing in SectorCommitments", id)
 			//	}
-			//	sectorInfo := go_sectorbuilder.SectorInfo{
+			//	sectorInfo := ffi.PublicSectorInfo{
 			//		SectorID: id,
 			//		CommR:    commitment.CommR,
 			//	}

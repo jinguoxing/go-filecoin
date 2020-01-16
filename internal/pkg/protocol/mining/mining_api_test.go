@@ -6,7 +6,6 @@ import (
 
 	bapi "github.com/filecoin-project/go-filecoin/internal/pkg/protocol/mining"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/protocol/storage"
-	"github.com/filecoin-project/go-filecoin/internal/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,7 +44,7 @@ func TestMiningAPI_MiningSetup(t *testing.T) {
 	defer nd.Stop(ctx)
 
 	require.NoError(t, api.MiningSetup(ctx))
-	assert.NotNil(t, nd.SectorBuilder())
+	assert.NotNil(t, nd.PieceManager())
 }
 
 func TestMiningAPI_MiningStart(t *testing.T) {
@@ -137,8 +136,8 @@ func newAPI(t *testing.T) (bapi.API, *node.Node) {
 	builder.WithGenesisInit(seed.GenesisInitFunc)
 	nd := builder.Build(ctx)
 	seed.GiveKey(t, nd, 0)
-	mAddr, ownerAddr := seed.GiveMiner(t, nd, 0)
-	_, err := storage.NewMiner(mAddr, ownerAddr, &storage.FakeProver{}, types.OneKiBSectorSize, nd, nd.Repo.DealsDatastore(), nd.PorcelainAPI)
+	seed.GiveMiner(t, nd, 0) // TODO: go-fil-markets integration
+	_, err := storage.NewMiner()
 	assert.NoError(t, err)
 	return bapi.New(
 		nd.MiningAddress,

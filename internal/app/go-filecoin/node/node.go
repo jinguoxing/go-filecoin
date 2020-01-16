@@ -621,7 +621,7 @@ func (node *Node) Host() host.Host {
 	return node.network.Host
 }
 
-// StorageMining returns the nodes sectorBuilder.
+// PieceManager returns the node's PieceManager.
 func (node *Node) PieceManager() piecemanager.PieceManager {
 	return node.StorageMining.PieceManager
 }

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	ffi "github.com/filecoin-project/filecoin-ffi"
+
 	"github.com/ipfs/go-cid"
 	files "github.com/ipfs/go-ipfs-files"
 	"github.com/multiformats/go-multihash"
@@ -434,7 +436,7 @@ func setupDeal(
 }
 
 func getMaxUserBytesPerStagedSector() uint64 {
-	return go_sectorbuilder.GetMaxUserBytesPerStagedSector(types.OneKiBSectorSize.Uint64())
+	return ffi.GetMaxUserBytesPerStagedSector(types.OneKiBSectorSize.Uint64())
 }
 
 func requireTestCID(t *testing.T, data []byte) cid.Cid {

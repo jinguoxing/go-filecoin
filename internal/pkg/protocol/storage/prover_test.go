@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	ffi "github.com/filecoin-project/filecoin-ffi"
+
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,7 +153,7 @@ func (f *fakeProverContext) WalletBalance(ctx context.Context, addr address.Addr
 	return types.ZeroAttoFIL, errors.New("no balance for worker")
 }
 
-func (f *fakeProverContext) CalculatePoSt(ctx context.Context, sortedCommRs go_sectorbuilder.SortedSectorInfo, seed types.PoStChallengeSeed) (types.PoStProof, error) {
+func (f *fakeProverContext) CalculatePoSt(ctx context.Context, sortedCommRs ffi.PrivateSectorInfo, seed types.PoStChallengeSeed) (types.PoStProof, error) {
 	return f.proof, nil
 }
 

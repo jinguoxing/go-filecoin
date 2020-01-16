@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-hamt-ipld"
-	"github.com/ipfs/go-ipfs-blockstore"
 	"math/big"
 	"testing"
+
+	ffi "github.com/filecoin-project/filecoin-ffi"
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-hamt-ipld"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	go_sectorbuilder "github.com/filecoin-project/go-sectorbuilder"
 
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/chain"
@@ -810,17 +810,15 @@ func TestMinerSubmitPoStVerification(t *testing.T) {
 		seed := types.PoStChallengeSeed{}
 		copy(seed[:], vmctx.RandomnessValue)
 
-		sortedRs := go_sectorbuilder.NewSortedSectorInfo(
-			go_sectorbuilder.SectorInfo{CommR: comm1.CommR},
-			go_sectorbuilder.SectorInfo{CommR: comm2.CommR},
+		sortedRs := ffi.NewSortedPublicSectorInfo(
+			ffi.PublicSectorInfo{CommR: comm1.CommR},
+			ffi.PublicSectorInfo{CommR: comm2.CommR},
 		)
 
-		assert.Equal(t, seed, verifier.LastReceivedVerifyPoStRequest.ChallengeSeed)
-		assert.Equal(t, 0, len(verifier.LastReceivedVerifyPoStRequest.Faults))
 		assert.Equal(t, testProof, verifier.LastReceivedVerifyPoStRequest.Proof)
-		assert.Equal(t, 2, len(verifier.LastReceivedVerifyPoStRequest.SortedSectorInfo.Values()))
-		assert.Equal(t, sortedRs.Values()[0].CommR, verifier.LastReceivedVerifyPoStRequest.SortedSectorInfo.Values()[0].CommR)
-		assert.Equal(t, sortedRs.Values()[1].CommR, verifier.LastReceivedVerifyPoStRequest.SortedSectorInfo.Values()[1].CommR)
+		assert.Equal(t, 2, len(verifier.LastReceivedVerifyPoStRequest.SectorInfo.Values()))
+		assert.Equal(t, sortedRs.Values()[0].CommR, verifier.LastReceivedVerifyPoStRequest.SectorInfo.Values()[0].CommR)
+		assert.Equal(t, sortedRs.Values()[1].CommR, verifier.LastReceivedVerifyPoStRequest.SectorInfo.Values()[1].CommR)
 	})
 
 	t.Run("Faults if proving set commitment is missing from sector commitments", func(t *testing.T) {

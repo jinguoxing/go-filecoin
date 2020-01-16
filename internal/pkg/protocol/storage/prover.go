@@ -90,9 +90,9 @@ func (p *Prover) CalculatePoSt(ctx context.Context, start, end *types.BlockHeigh
 	//	return nil, errors.Wrap(err, "failed to fetch PoSt challenge seed")
 	//}
 	//// Compute the actual proof.
-	//sectorInfos := make([]go_sectorbuilder.SectorInfo, len(inputs))
+	//sectorInfos := make([]ffi.PublicSectorInfo, len(inputs))
 	//for i, input := range inputs {
-	//	info := go_sectorbuilder.SectorInfo{
+	//	info := ffi.PublicSectorInfo{
 	//		CommR: input.CommR,
 	//	}
 	//	sectorInfos[i] = info
