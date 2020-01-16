@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
-
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-merkledag"
 	"github.com/libp2p/go-libp2p"
@@ -222,13 +220,6 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 		return nil, errors.Wrap(err, "failed to build node.BlockMining")
 	}
 
-	waiter := msg.NewWaiter(nd.chain.ChainReader, nd.chain.MessageStore, nd.Blockstore.Blockstore, nd.Blockstore.CborStore)
-
-	nd.StorageMining, err = submodule.NewStorageMiningSubmodule(ctx, address.Undef, address.Undef, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to build node.StorageMining")
-	}
-
 	nd.ProofVerification = submodule.NewProofVerificationSubmodule()
 
 	nd.StorageProtocol, err = submodule.NewStorageProtocolSubmodule(ctx)
@@ -251,7 +242,7 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 		MsgPool:      nd.Messaging.MsgPool,
 		MsgPreviewer: msg.NewPreviewer(nd.chain.ChainReader, nd.Blockstore.CborStore, nd.Blockstore.Blockstore, nd.chain.Processor),
 		ActState:     nd.chain.ActorState,
-		MsgWaiter:    waiter,
+		MsgWaiter:    msg.NewWaiter(nd.chain.ChainReader, nd.chain.MessageStore, nd.Blockstore.Blockstore, nd.Blockstore.CborStore),
 		Network:      nd.network.Network,
 		Outbox:       nd.Messaging.Outbox,
 		PieceManager: nd.PieceManager,

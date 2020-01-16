@@ -7,6 +7,13 @@ import (
 	"reflect"
 	"runtime"
 
+	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/paths"
+
+	"github.com/filecoin-project/go-sectorbuilder"
+
+	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/plumbing/msg"
+
+	a2 "github.com/filecoin-project/go-address"
 	bserv "github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-hamt-ipld"
@@ -111,7 +118,7 @@ func (node *Node) Start(ctx context.Context) error {
 
 	// Only set these up if there is a miner configured.
 	if _, err := node.MiningAddress(); err == nil {
-		if err := node.setupSectorBuilder(ctx); err != nil {
+		if err := node.setupStorageMining(ctx); err != nil {
 			log.Errorf("setup mining failed: %v", err)
 			return err
 		}
@@ -215,17 +222,6 @@ func (node *Node) setupHeartbeatServices(ctx context.Context) error {
 	return nil
 }
 
-func (node *Node) setupSectorBuilder(ctx context.Context) error {
-	// initialize a sector builder
-	sectorBuilder, err := initSectorBuilderForNode(ctx, node)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize sector builder")
-	}
-	node.StorageMining.PieceManager = sectorBuilder
-
-	return nil
-}
-
 func (node *Node) setIsMining(isMining bool) {
 	node.BlockMining.Mining.Lock()
 	defer node.BlockMining.Mining.Unlock()
@@ -282,7 +278,7 @@ func (node *Node) handleNewChainHeads(ctx context.Context, prevHead block.TipSet
 			}
 
 			if node.StorageProtocol.StorageMiner != nil {
-				// TODO: revisit whether this is necessary
+				// TODO: revisit whether this is necessary @acruikshank
 				//if _, err := node.StorageProtocol.StorageMiner.OnNewHeaviestTipSet(newHead); err != nil {
 				//	log.Error(err)
 				//}
@@ -379,10 +375,9 @@ func (node *Node) SetupMining(ctx context.Context) error {
 		return errors.Wrap(err, "failed to get miner actor")
 	}
 
-	// ensure we have a piece manager
-	// TODO: @laser we need a sector builder, too
-	if node.PieceManager() == nil {
-		if err := node.setupSectorBuilder(ctx); err != nil {
+	// ensure we've got our storage mining submodule configured
+	if node.StorageMining == (submodule.StorageMiningSubmodule{}) {
+		if err := node.setupStorageMining(ctx); err != nil {
 			return err
 		}
 	}
@@ -394,16 +389,62 @@ func (node *Node) SetupMining(ctx context.Context) error {
 		}
 	}
 
-	// ensure we have a storage miner
-	if node.StorageProtocol.StorageMiner == nil {
-		storageMiner, err := initStorageMinerForNode(ctx, node)
-		if err != nil {
-			return errors.Wrap(err, "failed to initialize storage miner")
-		}
-		node.StorageProtocol.StorageMiner = storageMiner
+	return nil
+}
+
+func (node *Node) setupStorageMining(ctx context.Context) error {
+	if node.StorageMining != (submodule.StorageMiningSubmodule{}) {
+		return errors.New("storage mining submodule has already been initialized")
 	}
 
-	return nil
+	minerAddr, err := node.MiningAddress()
+	if err != nil {
+		return err
+	}
+
+	sectorSize, err := node.PorcelainAPI.MinerGetSectorSize(ctx, minerAddr)
+	if err != nil {
+		return err
+	}
+
+	minerAddrParteDeux, err := a2.NewFromBytes(minerAddr.Bytes())
+	if err != nil {
+		return err
+	}
+
+	repoPath, err := node.Repo.Path()
+	if err != nil {
+		return err
+	}
+
+	sectorDir, err := paths.GetSectorPath(node.Repo.Config().SectorBase.RootDir, repoPath)
+	if err != nil {
+		return err
+	}
+
+	sectorBuilder, err := sectorbuilder.NewStandalone(&sectorbuilder.Config{
+		SectorSize:    sectorSize.Uint64(),
+		Miner:         minerAddrParteDeux,
+		WorkerThreads: 1,
+		Dir:           sectorDir,
+	})
+	if err != nil {
+		return err
+	}
+
+	workerAddr, err := node.PorcelainAPI.MinerGetWorkerAddress(ctx, minerAddr, node.Chain().ChainReader.GetHead())
+	if err != nil {
+		return err
+	}
+
+	waiter := msg.NewWaiter(node.chain.ChainReader, node.chain.MessageStore, node.Blockstore.Blockstore, node.Blockstore.CborStore)
+
+	sub, err := submodule.NewStorageMiningSubmodule(ctx, minerAddr, workerAddr, node.Repo.Datastore(), sectorBuilder, &node.chain, &node.Messaging, waiter, &node.Wallet)
+	if err != nil {
+		return err
+	}
+
+	node.StorageMining = sub
 }
 
 func (node *Node) doMiningPause(ctx context.Context) {
@@ -465,21 +506,6 @@ func (node *Node) StartMining(ctx context.Context) error {
 	node.setIsMining(true)
 
 	return nil
-}
-
-func initSectorBuilderForNode(ctx context.Context, node *Node) (piecemanager.PieceManager, error) {
-	// TODO: @laser review whether this is necessary now that we're using the node builder
-	panic("does this method make sense now that we're using the node builder?")
-
-	return nil, nil
-}
-
-// initStorageMinerForNode initializes the storage miner.
-func initStorageMinerForNode(ctx context.Context, node *Node) (*storage.Miner, error) {
-	// TODO: @laser is this required now that we're using the PieceManager?
-	panic("is this actually required now that we're using the PieceManager?")
-
-	return nil, nil
 }
 
 // StopMining stops mining on new blocks.
