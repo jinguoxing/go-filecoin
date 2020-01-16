@@ -743,20 +743,26 @@ func (a *Impl) CommitSector(ctx invocationContext, sectorID uint64, commD, commR
 		//
 		// This switching will be removed when issue #2270 is completed.
 		if !a.Bootstrap {
-			req := verification.VerifySealRequest{}
-			copy(req.CommD[:], commD)
-			copy(req.CommR[:], commR)
-			copy(req.CommRStar[:], commRStar)
-			req.Proof = proof
-			req.ProverAddress = ctx.LegacyMessage().To
-			req.SectorID = sectorID
-			req.SectorSize = state.SectorSize
+			var commRAry [32]byte
+			copy(commRAry[:], commR)
 
-			res, err := ctx.LegacyVerifier().VerifySeal(req)
+			var commDAry [32]byte
+			copy(commDAry[:], commD)
+
+			var proverID [32]byte
+			copy(proverID[:], ctx.LegacyMessage().To.Bytes()[:])
+
+			var ticket [32]byte
+			panic("need a ticket")
+
+			var seed [32]byte
+			panic("need a seed")
+
+			isValid, err := ctx.LegacyVerifier().VerifySeal(state.SectorSize.Uint64(), commRAry, commDAry, proverID, ticket, seed, sectorID, proof[:])
 			if err != nil {
 				return nil, errors.RevertErrorWrap(err, "failed to verify seal proof")
 			}
-			if !res.IsValid {
+			if !isValid {
 				return nil, Errors[ErrInvalidSealProof]
 			}
 		}

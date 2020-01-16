@@ -401,7 +401,7 @@ func (api *API) DAGImportData(ctx context.Context, data io.Reader) (ipld.Node, e
 	return api.dag.ImportData(ctx, data)
 }
 
-// PieceManagement returns the piece manager
+// StorageMining returns the piece manager
 func (api *API) PieceManager() piecemanager.PieceManager {
 	return api.pieceManager()
 }

@@ -224,10 +224,12 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 
 	waiter := msg.NewWaiter(nd.chain.ChainReader, nd.chain.MessageStore, nd.Blockstore.Blockstore, nd.Blockstore.CborStore)
 
-	nd.PieceManagement, err = submodule.NewPieceManagerSubmodule(ctx, address.Undef, address.Undef, nil, nil, nil, nil, nil, nil)
+	nd.StorageMining, err = submodule.NewStorageMiningSubmodule(ctx, address.Undef, address.Undef, nil, nil, nil, nil, nil, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build node.PieceManagement")
+		return nil, errors.Wrap(err, "failed to build node.StorageMining")
 	}
+
+	nd.ProofVerification = submodule.NewProofVerificationSubmodule()
 
 	nd.StorageProtocol, err = submodule.NewStorageProtocolSubmodule(ctx)
 	if err != nil {

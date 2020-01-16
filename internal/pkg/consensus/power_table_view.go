@@ -13,7 +13,6 @@ import (
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/actor/builtin/power"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/state"
-	sector "github.com/filecoin-project/go-sectorbuilder"
 )
 
 // PowerTableView defines the set of functions used by the ChainManager to view
@@ -98,7 +97,7 @@ func (v PowerTableView) HasPower(ctx context.Context, mAddr address.Address) (bo
 }
 
 // SortedSectorInfos returns the sector information for the given miner
-func (v PowerTableView) SortedSectorInfos(ctx context.Context, mAddr address.Address) (sector.SortedPublicSectorInfo, error) {
+func (v PowerTableView) SortedSectorInfos(ctx context.Context, mAddr address.Address) (ffi.SortedPublicSectorInfo, error) {
 	// Dragons: once we have a real VM we must get the sector infos from the
 	// miner actor.  For now we return a fake constant.
 	var fakeCommR1, fakeCommR2 [ffi.CommitmentBytesLen]byte

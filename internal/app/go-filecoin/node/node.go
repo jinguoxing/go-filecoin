@@ -71,10 +71,10 @@ type Node struct {
 	// Subsystems
 	//
 
-	chain           submodule.ChainSubmodule
-	syncer          submodule.SyncerSubmodule
-	BlockMining     submodule.BlockMiningSubmodule
-	PieceManagement submodule.PieceManagerSubmodule
+	chain         submodule.ChainSubmodule
+	syncer        submodule.SyncerSubmodule
+	BlockMining   submodule.BlockMiningSubmodule
+	StorageMining submodule.StorageMiningSubmodule
 
 	//
 	// Supporting services
@@ -83,6 +83,7 @@ type Node struct {
 	Wallet            submodule.WalletSubmodule
 	Messaging         submodule.MessagingSubmodule
 	StorageNetworking submodule.StorageNetworkingSubmodule
+	ProofVerification submodule.ProofVerificationSubmodule
 
 	//
 	// Protocols
@@ -220,7 +221,7 @@ func (node *Node) setupSectorBuilder(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize sector builder")
 	}
-	node.PieceManagement.PieceManager = sectorBuilder
+	node.StorageMining.PieceManager = sectorBuilder
 
 	return nil
 }
@@ -321,7 +322,7 @@ func (node *Node) Stop(ctx context.Context) {
 	//	if err := node.SectorBuilder().Close(); err != nil {
 	//		fmt.Printf("error closing sector builder: %s\n", err)
 	//	}
-	//	node.PieceManagement.PieceManager = nil
+	//	node.StorageMining.PieceManager = nil
 	//}
 
 	if err := node.Host().Close(); err != nil {
@@ -434,7 +435,7 @@ func (node *Node) doMiningPause(ctx context.Context) {
 }
 
 // StartMining causes the node to start feeding blocks to the mining worker and initializes
-// the PieceManagement for the mining address.
+// the StorageMining for the mining address.
 func (node *Node) StartMining(ctx context.Context) error {
 	if node.IsMining() {
 		return errors.New("Node is already mining")
@@ -620,9 +621,9 @@ func (node *Node) Host() host.Host {
 	return node.network.Host
 }
 
-// PieceManagement returns the nodes sectorBuilder.
+// StorageMining returns the nodes sectorBuilder.
 func (node *Node) PieceManager() piecemanager.PieceManager {
-	return node.PieceManagement.PieceManager
+	return node.StorageMining.PieceManager
 }
 
 // BlockService returns the nodes blockservice.

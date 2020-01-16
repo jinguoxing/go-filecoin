@@ -7,8 +7,7 @@ import (
 var log = logging.Logger("/fil/storage")
 
 // Miner is
-type Miner struct {
-}
+type Miner struct{}
 
 // NewMiner is
 func NewMiner() (*Miner, error) {
