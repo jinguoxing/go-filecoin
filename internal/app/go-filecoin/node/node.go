@@ -7,21 +7,20 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/paths"
-
-	"github.com/filecoin-project/go-sectorbuilder"
-
-	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/plumbing/msg"
-
 	a2 "github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-sectorbuilder"
 	bserv "github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
+	ds "github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-hamt-ipld"
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/pkg/errors"
 
 	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/internal/submodule"
+	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/paths"
+	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/plumbing/msg"
 	"github.com/filecoin-project/go-filecoin/internal/app/go-filecoin/porcelain"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/block"
 	"github.com/filecoin-project/go-filecoin/internal/pkg/chain"
@@ -422,12 +421,12 @@ func (node *Node) setupStorageMining(ctx context.Context) error {
 		return err
 	}
 
-	sectorBuilder, err := sectorbuilder.NewStandalone(&sectorbuilder.Config{
+	sectorBuilder, err := sectorbuilder.New(&sectorbuilder.Config{
 		SectorSize:    sectorSize.Uint64(),
 		Miner:         minerAddrParteDeux,
 		WorkerThreads: 1,
 		Dir:           sectorDir,
-	})
+	}, namespace.Wrap(node.Repo.Datastore(), ds.NewKey("/sectorbuilder")))
 	if err != nil {
 		return err
 	}
