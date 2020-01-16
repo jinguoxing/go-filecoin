@@ -39,24 +39,6 @@ func TestProposeDeal(t *testing.T) {
 	pieceSize := uint64(7)
 	pieceReader := bytes.NewReader(make([]byte, pieceSize))
 	testAPI := newTestClientAPI(t, pieceReader, pieceSize)
-	testNode := newTestClientNode(func(request interface{}) (interface{}, error) {
-		p, ok := request.(*storagedeal.SignedProposal)
-		require.True(t, ok)
-		proposal = p
-
-		pcid, err := convert.ToCid(p)
-		require.NoError(t, err)
-		resp := &storagedeal.SignedResponse{
-			Response: storagedeal.Response{
-				State:       storagedeal.Accepted,
-				Message:     "OK",
-				ProposalCid: pcid,
-			},
-		}
-		require.NoError(t, resp.Sign(testAPI.signer, testAPI.worker))
-		return resp, nil
-	})
-
 	client := NewClient()
 
 	dataCid := types.CidFromString(t, "somecid")
@@ -173,26 +155,6 @@ func TestProposeDealFailsWhenADealAlreadyExists(t *testing.T) {
 	ctx := context.Background()
 	addressCreator := address.NewForTestGetter()
 
-	pieceSize := uint64(7)
-	pieceReader := bytes.NewReader(make([]byte, pieceSize))
-	testAPI := newTestClientAPI(t, pieceReader, pieceSize)
-	testNode := newTestClientNode(func(request interface{}) (interface{}, error) {
-		p, ok := request.(*storagedeal.SignedProposal)
-		require.True(t, ok)
-
-		pcid, err := convert.ToCid(p)
-		require.NoError(t, err)
-		resp := &storagedeal.SignedResponse{
-			Response: storagedeal.Response{
-				State:       storagedeal.Accepted,
-				Message:     "OK",
-				ProposalCid: pcid,
-			},
-		}
-		require.NoError(t, resp.Sign(testAPI.signer, testAPI.worker))
-		return resp, nil
-	})
-
 	client := NewClient()
 
 	dataCid := types.CidFromString(t, "somecid")
@@ -211,30 +173,6 @@ func TestProposeDealFailsWhenSignatureIsInvalid(t *testing.T) {
 
 	ctx := context.Background()
 	addressCreator := address.NewForTestGetter()
-
-	pieceSize := uint64(7)
-	pieceReader := bytes.NewReader(make([]byte, pieceSize))
-	testAPI := newTestClientAPI(t, pieceReader, pieceSize)
-	testNode := newTestClientNode(func(request interface{}) (interface{}, error) {
-		p, ok := request.(*storagedeal.SignedProposal)
-		require.True(t, ok)
-
-		pcid, err := convert.ToCid(p.Proposal)
-		require.NoError(t, err)
-		resp := &storagedeal.SignedResponse{
-			Response: storagedeal.Response{
-				State:       storagedeal.Rejected,
-				Message:     "OK",
-				ProposalCid: pcid,
-			},
-		}
-		require.NoError(t, resp.Sign(testAPI.signer, testAPI.worker))
-
-		// Change a detail to invalidate signature
-		resp.State = storagedeal.Accepted
-
-		return resp, nil
-	})
 
 	client := NewClient()
 
