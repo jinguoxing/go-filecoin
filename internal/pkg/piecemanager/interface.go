@@ -20,8 +20,8 @@ type PieceManager interface {
 	// bytes produced by the Reader will not include any bit-padding.
 	UnsealSector(ctx context.Context, sectorId uint64) (io.ReadCloser, error)
 
-	// LocatePieceWithinSector produces information about the location of a
-	// deal's piece within a sealed sector, or an error if that piece does not
+	// LocatePieceForDealWithinSector produces information about the location of
+	// a deal's piece within a sealed sector, or an error if that piece does not
 	// exist within any sealed sectors.
-	LocatePieceWithinSector(ctx context.Context, dealID uint64) (sectorID uint64, offset uint64, length uint64, err error)
+	LocatePieceForDealWithinSector(ctx context.Context, dealID uint64) (sectorID uint64, offset uint64, length uint64, err error)
 }

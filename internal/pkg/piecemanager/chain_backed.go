@@ -55,7 +55,7 @@ func (s *ChainBackedPieceManager) UnsealSector(ctx context.Context, sectorId uin
 	return s.builder.ReadPieceFromSealedSector(sectorId, 0, s.builder.SectorSize(), ticket, commD)
 }
 
-func (s *ChainBackedPieceManager) LocatePieceWithinSector(ctx context.Context, dealID uint64) (sectorID uint64, offset uint64, length uint64, err error) {
+func (s *ChainBackedPieceManager) LocatePieceForDealWithinSector(ctx context.Context, dealID uint64) (sectorID uint64, offset uint64, length uint64, err error) {
 	/*
 
 		// how the storage market actor structures sector id -> []DealID mapping
