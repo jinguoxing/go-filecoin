@@ -444,6 +444,8 @@ func (node *Node) setupStorageMining(ctx context.Context) error {
 	}
 
 	node.StorageMining = sub
+
+	return nil
 }
 
 func (node *Node) doMiningPause(ctx context.Context) {
