@@ -19,7 +19,7 @@ import (
 
 // PieceManagerSubmodule enhances the `Node` with piece management capabilities.
 type PieceManagerSubmodule struct {
-	// PieceManager is used by the miner to fill and seal sectors.
+	// PieceManagement is used by the miner to fill and seal sectors.
 	PieceManager piecemanager.PieceManager
 }
 
@@ -67,7 +67,7 @@ func (s *ChainBackedPieceManager) SealPieceIntoNewSector(ctx context.Context, de
 	return nil
 }
 
-func (s *ChainBackedPieceManager) UnsealSector(sectorId uint64) (io.Reader, error) {
+func (s *ChainBackedPieceManager) UnsealSector(ctx context.Context, sectorId uint64) (io.ReadCloser, error) {
 	// - let ID = `sectorId`
 	// - get slice of pre-committed sector info PSIS from storage miner actor storage
 	// - let PSI = nil
@@ -79,7 +79,7 @@ func (s *ChainBackedPieceManager) UnsealSector(sectorId uint64) (io.Reader, erro
 	return s.builder.ReadPieceFromSealedSector(sectorId, 0, s.builder.SectorSize(), ticket, commD)
 }
 
-func (s *ChainBackedPieceManager) LocatePieceWithinSector(dealID uint64) (sectorID uint64, offset uint64, length uint64, err error) {
+func (s *ChainBackedPieceManager) LocatePieceWithinSector(ctx context.Context, dealID uint64) (sectorID uint64, offset uint64, length uint64, err error) {
 	/*
 
 		// how the storage market actor structures sector id -> []DealID mapping

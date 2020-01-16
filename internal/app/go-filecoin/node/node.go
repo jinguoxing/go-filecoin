@@ -71,10 +71,10 @@ type Node struct {
 	// Subsystems
 	//
 
-	chain        submodule.ChainSubmodule
-	syncer       submodule.SyncerSubmodule
-	BlockMining  submodule.BlockMiningSubmodule
-	PieceManager submodule.PieceManagerSubmodule
+	chain           submodule.ChainSubmodule
+	syncer          submodule.SyncerSubmodule
+	BlockMining     submodule.BlockMiningSubmodule
+	PieceManagement submodule.PieceManagerSubmodule
 
 	//
 	// Supporting services
@@ -122,7 +122,7 @@ func (node *Node) Start(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to set up protocols:")
 	}
-	node.RetrievalProtocol.RetrievalMiner = retrieval.NewMiner(node)
+	node.RetrievalProtocol.RetrievalMiner = retrieval.NewMiner()
 
 	var syncCtx context.Context
 	syncCtx, node.syncer.CancelChainSync = context.WithCancel(context.Background())
@@ -220,7 +220,7 @@ func (node *Node) setupSectorBuilder(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize sector builder")
 	}
-	node.PieceManager.PieceManager = sectorBuilder
+	node.PieceManagement.PieceManager = sectorBuilder
 
 	return nil
 }
@@ -281,9 +281,10 @@ func (node *Node) handleNewChainHeads(ctx context.Context, prevHead block.TipSet
 			}
 
 			if node.StorageProtocol.StorageMiner != nil {
-				if _, err := node.StorageProtocol.StorageMiner.OnNewHeaviestTipSet(newHead); err != nil {
-					log.Error(err)
-				}
+				// TODO: revisit whether this is necessary
+				//if _, err := node.StorageProtocol.StorageMiner.OnNewHeaviestTipSet(newHead); err != nil {
+				//	log.Error(err)
+				//}
 			}
 		case <-ctx.Done():
 			return
@@ -315,12 +316,13 @@ func (node *Node) Stop(ctx context.Context) {
 	node.cancelSubscriptions()
 	node.chain.ChainReader.Stop()
 
-	if node.SectorBuilder() != nil {
-		if err := node.SectorBuilder().Close(); err != nil {
-			fmt.Printf("error closing sector builder: %s\n", err)
-		}
-		node.PieceManager.PieceManager = nil
-	}
+	// TODO: @laser we'll need to stop both the PieceManager and the SectorBuilder
+	//if node.PieceManager() != nil {
+	//	if err := node.SectorBuilder().Close(); err != nil {
+	//		fmt.Printf("error closing sector builder: %s\n", err)
+	//	}
+	//	node.PieceManagement.PieceManager = nil
+	//}
 
 	if err := node.Host().Close(); err != nil {
 		fmt.Printf("error closing host: %s\n", err)
@@ -376,8 +378,9 @@ func (node *Node) SetupMining(ctx context.Context) error {
 		return errors.Wrap(err, "failed to get miner actor")
 	}
 
-	// ensure we have a sector builder
-	if node.SectorBuilder() == nil {
+	// ensure we have a piece manager
+	// TODO: @laser we need a sector builder, too
+	if node.PieceManager() == nil {
 		if err := node.setupSectorBuilder(ctx); err != nil {
 			return err
 		}
@@ -431,7 +434,7 @@ func (node *Node) doMiningPause(ctx context.Context) {
 }
 
 // StartMining causes the node to start feeding blocks to the mining worker and initializes
-// the PieceManager for the mining address.
+// the PieceManagement for the mining address.
 func (node *Node) StartMining(ctx context.Context) error {
 	if node.IsMining() {
 		return errors.New("Node is already mining")
@@ -464,92 +467,18 @@ func (node *Node) StartMining(ctx context.Context) error {
 }
 
 func initSectorBuilderForNode(ctx context.Context, node *Node) (piecemanager.PieceManager, error) {
-	minerAddr, err := node.MiningAddress()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get node's mining address")
-	}
+	// TODO: @laser review whether this is necessary now that we're using the node builder
+	panic("does this method make sense now that we're using the node builder?")
 
-	//sectorSize, err := node.PorcelainAPI.MinerGetSectorSize(ctx, minerAddr)
-	//if err != nil {
-	//	return nil, errors.Wrapf(err, "failed to get sector size for miner w/address %s", minerAddr.String())
-	//}
-
-	//lastUsedSectorID, err := node.PorcelainAPI.MinerGetLastCommittedSectorID(ctx, minerAddr)
-	//if err != nil {
-	//	return nil, errors.Wrapf(err, "failed to get last used sector id for miner w/address %s", minerAddr.String())
-	//}
-	//
-	//// TODO: Currently, weconfigure the StorageMiner to store its
-	//// metadata in the staging directory, it should be in its own directory.
-	////
-	//// Tracked here: https://github.com/filecoin-project/rust-fil-proofs/issues/402
-	//repoPath, err := node.Repo.Path()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//sectorDir, err := paths.GetSectorPath(node.Repo.Config().SectorBase.RootDir, repoPath)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//stagingDir, err := paths.StagingDir(sectorDir)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//sealedDir, err := paths.SealedDir(sectorDir)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//cfg := piecemanager.StorageMinerConfig{
-	//	LastUsedSectorID: lastUsedSectorID,
-	//	MetadataDir:      stagingDir,
-	//	MinerAddr:        minerAddr,
-	//	SealedSectorDir:  sealedDir,
-	//	StagedSectorDir:  stagingDir,
-	//}
-
-	sb, err := piecemanager.NewStorageMiner(nil, nil, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to initialize sector builder for miner %s", minerAddr.String()))
-	}
-
-	return sb, nil
+	return nil, nil
 }
 
 // initStorageMinerForNode initializes the storage miner.
 func initStorageMinerForNode(ctx context.Context, node *Node) (*storage.Miner, error) {
-	minerAddr, err := node.MiningAddress()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get node's mining address")
-	}
+	// TODO: @laser is this required now that we're using the PieceManager?
+	panic("is this actually required now that we're using the PieceManager?")
 
-	ownerAddress, err := node.PorcelainAPI.MinerGetOwnerAddress(ctx, minerAddr)
-	if err != nil {
-		return nil, errors.Wrap(err, "no mining owner available, skipping storage miner setup")
-	}
-
-	sectorSize, err := node.PorcelainAPI.MinerGetSectorSize(ctx, minerAddr)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch miner's sector size")
-	}
-
-	// TODO: this prover needs a calculator that can calculate a PoSt
-	prover := storage.NewProver(minerAddr, sectorSize, node.PorcelainAPI, nil)
-
-	miner, err := storage.NewMiner(
-		minerAddr,
-		ownerAddress,
-		prover,
-		sectorSize,
-		node,
-		node.Repo.DealsDatastore(),
-		node.PorcelainAPI)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to instantiate storage miner")
-	}
-
-	return miner, nil
+	return nil, nil
 }
 
 // StopMining stops mining on new blocks.
@@ -606,11 +535,11 @@ func (node *Node) setupProtocols() error {
 	node.BlockMining.BlockMiningAPI = &blockMiningAPI
 
 	// set up retrieval client and api
-	retapi := retrieval.NewAPI(retrieval.NewClient(node.network.Host, node.PorcelainAPI))
+	retapi := retrieval.NewAPI(retrieval.NewClient())
 	node.RetrievalProtocol.RetrievalAPI = &retapi
 
 	// set up storage client and api
-	smc := storage.NewClient(node.network.Host, node.PorcelainAPI)
+	smc := storage.NewClient()
 	smcAPI := storage.NewAPI(smc)
 	node.StorageProtocol.StorageAPI = &smcAPI
 	return nil
@@ -691,9 +620,9 @@ func (node *Node) Host() host.Host {
 	return node.network.Host
 }
 
-// PieceManager returns the nodes sectorBuilder.
-func (node *Node) SectorBuilder() piecemanager.PieceManager {
-	return node.PieceManager.PieceManager
+// PieceManagement returns the nodes sectorBuilder.
+func (node *Node) PieceManager() piecemanager.PieceManager {
+	return node.PieceManagement.PieceManager
 }
 
 // BlockService returns the nodes blockservice.

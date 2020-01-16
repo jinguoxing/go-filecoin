@@ -11,7 +11,7 @@ type PieceManager interface {
 	// sector is encoded and, when the required bits of chain randomness are
 	// available, committed to the network. This method is fire-and-forget; any
 	// errors encountered during the pre-commit or commit flows (including
-	// message creation) are recorded in PieceManager metadata but not exposed
+	// message creation) are recorded in PieceManagement metadata but not exposed
 	// through this API.
 	SealPieceIntoNewSector(ctx context.Context, dealID uint64, pieceSize uint64, pieceReader io.Reader) error
 

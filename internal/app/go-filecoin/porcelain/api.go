@@ -243,9 +243,9 @@ func (a *API) ClientValidateDeal(ctx context.Context, proposalCid cid.Cid, proof
 	return ClientVerifyStorageDeal(ctx, a, proposalCid, proofInfo)
 }
 
-// AddPiece adds a piece to a staged sector
-func (a *API) AddPiece(ctx context.Context, dealID uint64, reader io.Reader) (uint64, error) {
-	return AddPiece(ctx, a, dealID, reader)
+// SealPieceIntoNewSector writes the provided piece into a new sector
+func (a *API) SealPieceIntoNewSector(ctx context.Context, dealID uint64, pieceSize uint64, pieceReader io.Reader) error {
+	return SealPieceIntoNewSector(ctx, a, dealID, pieceSize, pieceReader)
 }
 
 // PingMinerWithTimeout pings a storage or retrieval miner, waiting the given

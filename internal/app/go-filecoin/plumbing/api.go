@@ -45,58 +45,58 @@ import (
 type API struct {
 	logger logging.EventLogger
 
-	chain         *cst.ChainStateReadWriter
-	syncer        *cst.ChainSyncProvider
-	config        *cfg.Config
-	dag           *dag.DAG
-	expected      consensus.Protocol
-	msgPool       *message.Pool
-	msgPreviewer  *msg.Previewer
-	actorState    *consensus.ActorStateStore
-	msgWaiter     *msg.Waiter
-	network       *net.Network
-	outbox        *message.Outbox
-	sectorBuilder func() piecemanager.PieceManager
-	storagedeals  *strgdls.Store
-	wallet        *wallet.Wallet
+	chain        *cst.ChainStateReadWriter
+	syncer       *cst.ChainSyncProvider
+	config       *cfg.Config
+	dag          *dag.DAG
+	expected     consensus.Protocol
+	msgPool      *message.Pool
+	msgPreviewer *msg.Previewer
+	actorState   *consensus.ActorStateStore
+	msgWaiter    *msg.Waiter
+	network      *net.Network
+	outbox       *message.Outbox
+	pieceManager func() piecemanager.PieceManager
+	storagedeals *strgdls.Store
+	wallet       *wallet.Wallet
 }
 
 // APIDeps contains all the API's dependencies
 type APIDeps struct {
-	Chain         *cst.ChainStateReadWriter
-	ActState      *consensus.ActorStateStore
-	Sync          *cst.ChainSyncProvider
-	Config        *cfg.Config
-	DAG           *dag.DAG
-	Deals         *strgdls.Store
-	Expected      consensus.Protocol
-	MsgPool       *message.Pool
-	MsgPreviewer  *msg.Previewer
-	MsgWaiter     *msg.Waiter
-	Network       *net.Network
-	Outbox        *message.Outbox
-	SectorBuilder func() piecemanager.PieceManager
-	Wallet        *wallet.Wallet
+	Chain        *cst.ChainStateReadWriter
+	ActState     *consensus.ActorStateStore
+	Sync         *cst.ChainSyncProvider
+	Config       *cfg.Config
+	DAG          *dag.DAG
+	Deals        *strgdls.Store
+	Expected     consensus.Protocol
+	MsgPool      *message.Pool
+	MsgPreviewer *msg.Previewer
+	MsgWaiter    *msg.Waiter
+	Network      *net.Network
+	Outbox       *message.Outbox
+	PieceManager func() piecemanager.PieceManager
+	Wallet       *wallet.Wallet
 }
 
 // New constructs a new instance of the API.
 func New(deps *APIDeps) *API {
 	return &API{
-		logger:        logging.Logger("porcelain"),
-		chain:         deps.Chain,
-		actorState:    deps.ActState,
-		syncer:        deps.Sync,
-		config:        deps.Config,
-		dag:           deps.DAG,
-		expected:      deps.Expected,
-		msgPool:       deps.MsgPool,
-		msgPreviewer:  deps.MsgPreviewer,
-		msgWaiter:     deps.MsgWaiter,
-		network:       deps.Network,
-		outbox:        deps.Outbox,
-		sectorBuilder: deps.SectorBuilder,
-		storagedeals:  deps.Deals,
-		wallet:        deps.Wallet,
+		logger:       logging.Logger("porcelain"),
+		chain:        deps.Chain,
+		actorState:   deps.ActState,
+		syncer:       deps.Sync,
+		config:       deps.Config,
+		dag:          deps.DAG,
+		expected:     deps.Expected,
+		msgPool:      deps.MsgPool,
+		msgPreviewer: deps.MsgPreviewer,
+		msgWaiter:    deps.MsgWaiter,
+		network:      deps.Network,
+		outbox:       deps.Outbox,
+		pieceManager: deps.PieceManager,
+		storagedeals: deps.Deals,
+		wallet:       deps.Wallet,
 	}
 }
 
@@ -401,7 +401,7 @@ func (api *API) DAGImportData(ctx context.Context, data io.Reader) (ipld.Node, e
 	return api.dag.ImportData(ctx, data)
 }
 
-// PieceManager returns the sector builder
-func (api *API) SectorBuilder() piecemanager.PieceManager {
-	return api.sectorBuilder()
+// PieceManagement returns the piece manager
+func (api *API) PieceManager() piecemanager.PieceManager {
+	return api.pieceManager()
 }

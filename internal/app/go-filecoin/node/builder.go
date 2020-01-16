@@ -2,8 +2,9 @@ package node
 
 import (
 	"context"
-	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
 	"time"
+
+	"github.com/filecoin-project/go-filecoin/internal/pkg/vm/address"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-merkledag"
@@ -223,9 +224,9 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 
 	waiter := msg.NewWaiter(nd.chain.ChainReader, nd.chain.MessageStore, nd.Blockstore.Blockstore, nd.Blockstore.CborStore)
 
-	nd.PieceManager, err = submodule.NewPieceManagerSubmodule(ctx, address.Undef, address.Undef, nil, nil, nil)
+	nd.PieceManagement, err = submodule.NewPieceManagerSubmodule(ctx, address.Undef, address.Undef, nil, nil, nil, nil, nil, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build node.PieceManager")
+		return nil, errors.Wrap(err, "failed to build node.PieceManagement")
 	}
 
 	nd.StorageProtocol, err = submodule.NewStorageProtocolSubmodule(ctx)
@@ -239,20 +240,20 @@ func (b *Builder) build(ctx context.Context) (*Node, error) {
 	}
 
 	nd.PorcelainAPI = porcelain.New(plumbing.New(&plumbing.APIDeps{
-		Chain:         nd.chain.State,
-		Sync:          cst.NewChainSyncProvider(nd.syncer.ChainSyncManager),
-		Config:        cfg.NewConfig(b.repo),
-		DAG:           dag.NewDAG(merkledag.NewDAGService(nd.Blockservice.Blockservice)),
-		Deals:         strgdls.New(b.repo.DealsDatastore()),
-		Expected:      nd.syncer.Consensus,
-		MsgPool:       nd.Messaging.MsgPool,
-		MsgPreviewer:  msg.NewPreviewer(nd.chain.ChainReader, nd.Blockstore.CborStore, nd.Blockstore.Blockstore, nd.chain.Processor),
-		ActState:      nd.chain.ActorState,
-		MsgWaiter:     waiter,
-		Network:       nd.network.Network,
-		Outbox:        nd.Messaging.Outbox,
-		SectorBuilder: nd.SectorBuilder,
-		Wallet:        nd.Wallet.Wallet,
+		Chain:        nd.chain.State,
+		Sync:         cst.NewChainSyncProvider(nd.syncer.ChainSyncManager),
+		Config:       cfg.NewConfig(b.repo),
+		DAG:          dag.NewDAG(merkledag.NewDAGService(nd.Blockservice.Blockservice)),
+		Deals:        strgdls.New(b.repo.DealsDatastore()),
+		Expected:     nd.syncer.Consensus,
+		MsgPool:      nd.Messaging.MsgPool,
+		MsgPreviewer: msg.NewPreviewer(nd.chain.ChainReader, nd.Blockstore.CborStore, nd.Blockstore.Blockstore, nd.chain.Processor),
+		ActState:     nd.chain.ActorState,
+		MsgWaiter:    waiter,
+		Network:      nd.network.Network,
+		Outbox:       nd.Messaging.Outbox,
+		PieceManager: nd.PieceManager,
+		Wallet:       nd.Wallet.Wallet,
 	}))
 
 	return nd, nil

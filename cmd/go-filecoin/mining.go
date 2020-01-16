@@ -228,13 +228,23 @@ to add data outside of a deal.
 			return fmt.Errorf("given file was not a files.File")
 		}
 
+		// TODO: @laser - what's the desired output, here? the
+		// SealPieceIntoNewSector method is going to return long before the
+		// sector's pre-commit and commit messages are mined into blocks
 		panic("we need a deal id here")
-		sectorID, err := GetPorcelainAPI(env).AddPiece(req.Context, 42, fi)
+
+		n, err := fi.Size()
 		if err != nil {
 			return err
 		}
 
-		return re.Emit(MiningAddPieceResult{SectorID: sectorID})
+		err = GetPorcelainAPI(env).SealPieceIntoNewSector(req.Context, 42, uint64(n), fi)
+		if err != nil {
+			return err
+		}
+
+		// TODO: @laser - again, we need to rethink this return structure
+		return re.Emit(MiningAddPieceResult{SectorID: 42})
 	},
 	Type: MiningAddPieceResult{},
 	Encoders: cmds.EncoderMap{
